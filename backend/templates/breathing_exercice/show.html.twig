@@ -1,0 +1,58 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}BreathingExercice{% endblock %}
+
+{% block body %}
+    <h1>BreathingExercice</h1>
+
+    <table class="table">
+        <tbody>
+            <tr>
+                <th>Id</th>
+                <td>{{ breathing_exercice.id }}</td>
+            </tr>
+            <tr>
+                <th>Name</th>
+                <td>{{ breathing_exercice.name }}</td>
+            </tr>
+            <tr>
+                <th>Duration</th>
+                <td>{{ breathing_exercice.duration }}</td>
+            </tr>
+            <tr>
+                <th>Description</th>
+                <td>{{ breathing_exercice.description }}</td>
+            </tr>
+            <tr>
+                <th>Type</th>
+                <td>{{ breathing_exercice.type }}</td>
+            </tr>
+            <tr>
+                <th>TimeInhale</th>
+                <td>{{ breathing_exercice.timeInhale }}</td>
+            </tr>
+            <tr>
+                <th>TimeHold</th>
+                <td>{{ breathing_exercice.timeHold }}</td>
+            </tr>
+            <tr>
+                <th>TimeExhale</th>
+                <td>{{ breathing_exercice.timeExhale }}</td>
+            </tr>
+            <tr>
+                <th>NumberCycle</th>
+                <td>{{ breathing_exercice.numberCycle }}</td>
+            </tr>
+            <tr>
+                <th>CreatedAt</th>
+                <td>{{ breathing_exercice.createdAt }}</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <a href="{{ path('app_breathing_exercice_index') }}">back to list</a>
+
+    <a href="{{ path('app_breathing_exercice_edit', {'id': breathing_exercice.id}) }}">edit</a>
+
+    {{ include('breathing_exercice/_delete_form.html.twig') }}
+{% endblock %}
