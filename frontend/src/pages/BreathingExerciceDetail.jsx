@@ -25,7 +25,7 @@ function buildPhases(ex) {
 export default function BreathingExerciceDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { hasRole } = useAuth();
+  const { hasRole, isAuthenticated } = useAuth();
 
   const [exercice, setExercice] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -38,6 +38,7 @@ export default function BreathingExerciceDetail() {
   const [countdown, setCountdown] = useState(0);
   const [isDone, setIsDone] = useState(false);
   const [completed, setCompleted] = useState(false);
+  const [customCycles, setCustomCycles] = useState(null);
 
   const intervalRef = useRef(null);
   const stateRef = useRef({ phaseIndex: 0, countdown: 0, currentCycle: 0 });
@@ -47,6 +48,7 @@ export default function BreathingExerciceDetail() {
       .then((res) => {
         setExercice(res.data);
         setIsDone(res.data.isDone);
+        setCustomCycles(res.data.numberCycle);
       })
       .catch(() => setError('Exercice introuvable.'))
       .finally(() => setLoading(false));
@@ -64,16 +66,19 @@ export default function BreathingExerciceDetail() {
     stopTimer();
     setCompleted(true);
     setIsDone(true);
-    try {
-      await completeBreathingExercice(id);
-    } catch {
-      // silently ignore – mark local state anyway
+    if (isAuthenticated) {
+      try {
+        await completeBreathingExercice(id);
+      } catch {
+        // silently ignore – mark local state anyway
+      }
     }
-  }, [id, stopTimer]);
+  }, [id, isAuthenticated, stopTimer]);
 
   const startTimer = useCallback(() => {
-    if (!exercice) return;
+    if (!exercice || !customCycles) return;
     const phases = buildPhases(exercice);
+    const totalCycles = customCycles;
 
     // Reset
     setCurrentCycle(0);
@@ -92,16 +97,13 @@ export default function BreathingExerciceDetail() {
       stateRef.current.countdown -= 1;
 
       if (stateRef.current.countdown <= 0) {
-        // Move to next phase
         let nextPhase = stateRef.current.phaseIndex + 1;
 
         if (nextPhase >= phases.length) {
-          // End of a cycle
           nextPhase = 0;
           stateRef.current.currentCycle += 1;
 
-          if (stateRef.current.currentCycle >= exercice.numberCycle) {
-            // All cycles done
+          if (stateRef.current.currentCycle >= totalCycles) {
             setCurrentCycle(stateRef.current.currentCycle);
             setPhaseIndex(0);
             setCountdown(0);
@@ -118,7 +120,7 @@ export default function BreathingExerciceDetail() {
 
       setCountdown(stateRef.current.countdown);
     }, 1000);
-  }, [exercice, handleComplete]);
+  }, [exercice, handleComplete, customCycles]);
 
   // Cleanup on unmount
   useEffect(() => {
@@ -141,15 +143,27 @@ export default function BreathingExerciceDetail() {
   const phases = buildPhases(exercice);
   const currentPhase = phases[phaseIndex];
 
-  // Circle animation scale: inhale = big, hold = big, exhale = small
-  const circleScale = isRunning
-    ? (currentPhase?.key === 'exhale' ? 0.5 : 1)
-    : 0.75;
+  const cycles = customCycles ?? exercice.numberCycle;
+  const cycleDuration = exercice.timeInhale + (exercice.timeHold || 0) + exercice.timeExhale;
+  const computedDuration = cycles * cycleDuration;
 
-  // Progress for the circle fill (countdown within phase)
-  const phaseProgress = isRunning && currentPhase
-    ? (countdown / currentPhase.duration)
-    : 0;
+  const BAR_HEIGHT = 360;
+  const BALL_SIZE = 52;
+  const BALL_PADDING = 8;
+
+  const ballTop = !isRunning
+    ? (BAR_HEIGHT - BALL_SIZE) / 2
+    : currentPhase?.key === 'exhale'
+    ? BAR_HEIGHT - BALL_SIZE - BALL_PADDING
+    : BALL_PADDING;
+
+  const ballTransition = !isRunning
+    ? 'top 0.6s ease'
+    : currentPhase?.key === 'hold'
+    ? 'top 0s'
+    : currentPhase?.key === 'inhale'
+    ? `top ${exercice.timeInhale}s ease-in-out`
+    : `top ${exercice.timeExhale}s ease-in-out`;
 
   return (
     <div className="page breathing-detail">
@@ -170,33 +184,35 @@ export default function BreathingExerciceDetail() {
         <div className="breathing-info-panel">
           <span className="badge badge-type">{exercice.type}</span>
           <h1>{exercice.name}</h1>
+
+          <div className="breathing-phases-inline">
+            <span>Inspiration <strong>{exercice.timeInhale}s</strong></span>
+            {exercice.timeHold && <span>· Rétention <strong>{exercice.timeHold}s</strong></span>}
+            <span>· Expiration <strong>{exercice.timeExhale}s</strong></span>
+          </div>
+
           <p className="breathing-description">{exercice.description}</p>
 
           <div className="breathing-stats">
             <div className="stat">
-              <span className="stat-label">Durée totale</span>
-              <span className="stat-value">{formatDuration(exercice.duration)}</span>
+              <span className="stat-label">Durée estimée</span>
+              <span className="stat-value">{formatDuration(computedDuration)}</span>
             </div>
             <div className="stat">
               <span className="stat-label">Cycles</span>
-              <span className="stat-value">{exercice.numberCycle}</span>
-            </div>
-          </div>
-
-          <div className="breathing-phases-detail">
-            <div className="phase-item">
-              <span className="phase-label">Inspiration</span>
-              <span className="phase-duration">{exercice.timeInhale}s</span>
-            </div>
-            {exercice.timeHold && (
-              <div className="phase-item">
-                <span className="phase-label">Rétention</span>
-                <span className="phase-duration">{exercice.timeHold}s</span>
+              <div className="cycles-control">
+                <button
+                  className="cycles-btn"
+                  onClick={() => setCustomCycles(Math.max(1, cycles - 1))}
+                  disabled={isRunning || cycles <= 1}
+                >−</button>
+                <span className="cycles-value">{cycles}</span>
+                <button
+                  className="cycles-btn"
+                  onClick={() => setCustomCycles(cycles + 1)}
+                  disabled={isRunning}
+                >+</button>
               </div>
-            )}
-            <div className="phase-item">
-              <span className="phase-label">Expiration</span>
-              <span className="phase-duration">{exercice.timeExhale}s</span>
             </div>
           </div>
 
@@ -210,44 +226,42 @@ export default function BreathingExerciceDetail() {
             <div className="completed-message">
               <div className="completed-icon">✓</div>
               <h2>Exercice terminé !</h2>
-              <p>Félicitations, vous avez complété les {exercice.numberCycle} cycles.</p>
+              <p>Félicitations, vous avez complété les {cycles} cycles.</p>
               <button className="btn btn-primary" onClick={() => { setCompleted(false); setIsRunning(false); }}>
                 Recommencer
               </button>
             </div>
           ) : (
             <>
-              <div className="breathing-circle-wrapper">
-                <div
-                  className={`breathing-circle ${isRunning ? `phase-${currentPhase?.key}` : ''}`}
-                  style={{
-                    transform: `scale(${circleScale})`,
-                    transition: isRunning
-                      ? `transform ${currentPhase?.key === 'hold' ? 0 : countdown}s ease-in-out`
-                      : 'transform 0.5s ease',
-                  }}
-                >
-                  {isRunning ? (
-                    <>
-                      <span className="circle-phase">{currentPhase?.label}</span>
-                      <span className="circle-countdown">{countdown}</span>
-                    </>
-                  ) : (
-                    <span className="circle-phase">Prêt ?</span>
-                  )}
+              <div className="breathing-bar-wrapper">
+                <div className="bar-status">
+                  <span className="bar-phase-label">
+                    {isRunning ? currentPhase?.label : 'Prêt ?'}
+                  </span>
+                  {isRunning && <span className="bar-countdown">{countdown}</span>}
                 </div>
-              </div>
 
-              {isRunning && (
-                <div className="cycle-progress">
-                  Cycle {currentCycle + 1} / {exercice.numberCycle}
+                <div className="breathing-bar-track">
+                  <div
+                    className={`breathing-ball${isRunning ? ` ball-${currentPhase?.key}` : ''}`}
+                    style={{
+                      top: `${ballTop}px`,
+                      transition: ballTransition,
+                    }}
+                  />
                 </div>
-              )}
+
+                {isRunning && (
+                  <div className="cycle-progress">
+                    Cycle {currentCycle + 1} / {cycles}
+                  </div>
+                )}
+              </div>
 
               <div className="timer-controls">
                 {!isRunning ? (
                   <button className="btn btn-primary btn-large" onClick={startTimer}>
-                    ▶ Commencer
+                    Lancer la séance
                   </button>
                 ) : (
                   <button className="btn btn-danger" onClick={handleStop}>

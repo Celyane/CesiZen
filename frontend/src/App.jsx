@@ -51,23 +51,9 @@ export default function App() {
                   </PrivateRoute>
                 }
               />
-              <Route
-                path="/resources/:id"
-                element={
-                  <PrivateRoute>
-                    <ResourceDetail />
-                  </PrivateRoute>
-                }
-              />
+              <Route path="/resources/:id" element={<ResourceDetail />} />
 
-              <Route
-                path="/breathing-exercices"
-                element={
-                  <PrivateRoute>
-                    <BreathingExercices />
-                  </PrivateRoute>
-                }
-              />
+              <Route path="/breathing-exercices" element={<BreathingExercices />} />
               <Route
                 path="/breathing-exercices/new"
                 element={
@@ -84,14 +70,7 @@ export default function App() {
                   </AdminRoute>
                 }
               />
-              <Route
-                path="/breathing-exercices/:id"
-                element={
-                  <PrivateRoute>
-                    <BreathingExerciceDetail />
-                  </PrivateRoute>
-                }
-              />
+              <Route path="/breathing-exercices/:id" element={<BreathingExerciceDetail />} />
 
               <Route
                 path="/profile"

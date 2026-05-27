@@ -28,12 +28,15 @@ export default function Navbar() {
   return (
     <nav className="navbar">
       <div className="navbar-brand">
-        <Link to="/">CesiZen</Link>
+        <Link to="/">
+          <img src="/cesiZen.png" alt="CesiZen" className="navbar-logo" />
+          CesiZen
+        </Link>
       </div>
 
       <div className="navbar-links">
         <Link to="/resources">Ressources</Link>
-        {isAuthenticated && <Link to="/breathing-exercices">Exercices</Link>}
+        <Link to="/breathing-exercices">Exercices</Link>
         {isAuthenticated && hasRole('ROLE_ADMIN') && (
           <Link to="/admin">Admin</Link>
         )}

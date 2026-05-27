@@ -14,7 +14,6 @@ use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Security\Http\Attribute\IsGranted;
 
 #[Route('/api/breathing-exercices')]
-#[IsGranted('IS_AUTHENTICATED_FULLY')]
 class ApiBreathingExerciceController extends AbstractController
 {
     private function serialize(BreathingExercice $ex, ?User $user = null): array
@@ -42,7 +41,7 @@ class ApiBreathingExerciceController extends AbstractController
     #[Route('', name: 'api_breathing_list', methods: ['GET'])]
     public function list(BreathingExerciceRepository $repo): JsonResponse
     {
-        /** @var User $user */
+        /** @var User|null $user */
         $user = $this->getUser();
         $exercices = $repo->findAll();
 
@@ -52,7 +51,7 @@ class ApiBreathingExerciceController extends AbstractController
     #[Route('/{id}', name: 'api_breathing_show', methods: ['GET'])]
     public function show(BreathingExercice $exercice): JsonResponse
     {
-        /** @var User $user */
+        /** @var User|null $user */
         $user = $this->getUser();
         return $this->json($this->serialize($exercice, $user));
     }
@@ -117,6 +116,7 @@ class ApiBreathingExerciceController extends AbstractController
     }
 
     #[Route('/{id}/complete', name: 'api_breathing_complete', methods: ['POST'])]
+    #[IsGranted('IS_AUTHENTICATED_FULLY')]
     public function complete(BreathingExercice $exercice, EntityManagerInterface $em): JsonResponse
     {
         /** @var User $user */

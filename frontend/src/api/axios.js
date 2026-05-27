@@ -7,7 +7,6 @@ const api = axios.create({
   },
 });
 
-// Request interceptor: attach JWT token if present
 api.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem('token');
@@ -19,13 +18,11 @@ api.interceptors.request.use(
   (error) => Promise.reject(error)
 );
 
-// Response interceptor: logout on 401
 api.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response && error.response.status === 401) {
       localStorage.removeItem('token');
-      // Redirect to login only if not already there
       if (window.location.pathname !== '/login') {
         window.location.href = '/login';
       }

@@ -61,7 +61,7 @@ export default function AdminResources() {
                 <th>Titre</th>
                 <th>Type</th>
                 <th>Auteur</th>
-                <th>Publiée</th>
+                <th>Statut</th>
                 <th>Vues</th>
                 <th>Favoris</th>
                 <th>Date</th>
@@ -78,11 +78,11 @@ export default function AdminResources() {
                   <td>{r.author.firstname} {r.author.lastname}</td>
                   <td>
                     <button
-                      className={`btn btn-sm ${r.visible ? 'btn-accent' : 'btn-outline'}`}
+                      className={`btn btn-sm ${r.visible ? 'btn-outline btn-suspend' : 'btn-warning'}`}
                       onClick={() => handleToggleVisibility(r.id)}
-                      title={r.visible ? 'Cliquer pour masquer' : 'Cliquer pour publier'}
+                      title={r.visible ? 'Suspendre la ressource' : 'Réactiver la ressource'}
                     >
-                      {r.visible ? 'Oui' : 'Non'}
+                      {r.visible ? 'Suspendre' : '⚠ Suspendue'}
                     </button>
                   </td>
                   <td>{r.readCount}</td>

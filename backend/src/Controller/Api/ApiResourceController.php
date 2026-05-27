@@ -52,14 +52,13 @@ class ApiResourceController extends AbstractController
     }
 
     #[Route('/{id}', name: 'api_resource_show', methods: ['GET'])]
-    #[IsGranted('IS_AUTHENTICATED_FULLY')]
     public function show(Resource $resource): JsonResponse
     {
         if (!$resource->isVisible()) {
             return $this->json(['message' => 'Resource not found'], Response::HTTP_NOT_FOUND);
         }
 
-        /** @var User $user */
+        /** @var User|null $user */
         $user = $this->getUser();
         return $this->json($this->serialize($resource, $user));
     }
