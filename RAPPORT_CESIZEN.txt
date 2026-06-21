@@ -1,0 +1,623 @@
+================================================================================
+           RAPPORT TECHNIQUE - APPLICATION CESIZEN
+           Symfony 8 (API REST) + React 18 | Date : 21/06/2026
+================================================================================
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  PARTIE 1 — RÉSUMÉ DES RÔLES
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+L'application utilise un système de rôles hiérarchique à 3 niveaux, défini dans
+backend/config/packages/security.yaml.
+
+Hiérarchie (du plus bas au plus élevé) :
+  ROLE_USER  <  ROLE_REDACTOR  <  ROLE_ADMIN
+
+Un rôle supérieur hérite automatiquement de tous les droits des rôles inférieurs.
+
+──────────────────────────────────────────────────────────────────────────────
+  RÔLE 1 : ROLE_USER (utilisateur standard)
+──────────────────────────────────────────────────────────────────────────────
+Attribué par défaut à tout utilisateur inscrit.
+
+Permissions :
+  ✔ Consulter les ressources visibles (articles, contenus)
+  ✔ Pratiquer les exercices de respiration
+  ✔ Marquer des ressources comme lues
+  ✔ Ajouter/retirer des ressources en favoris
+  ✔ Consulter son activité personnelle (/api/me/activity)
+  ✔ Modifier son profil (/api/me)
+  ✔ Supprimer son propre compte (/api/me DELETE)
+
+Restrictions :
+  ✘ Créer ou modifier des ressources
+  ✘ Créer des exercices de respiration
+  ✘ Accéder au panneau d'administration
+  ✘ Gérer les autres utilisateurs
+
+──────────────────────────────────────────────────────────────────────────────
+  RÔLE 2 : ROLE_REDACTOR (rédacteur de contenu)
+──────────────────────────────────────────────────────────────────────────────
+Attribué manuellement par un administrateur.
+
+Hérite de : ROLE_USER (tous ses droits)
+
+Permissions supplémentaires :
+  ✔ Créer de nouvelles ressources (POST /api/resources)
+  ✔ Modifier ses propres ressources (PUT /api/resources/{id})
+  ✔ Supprimer ses propres ressources (DELETE /api/resources/{id})
+
+Restrictions :
+  ✘ Modifier les ressources d'autres auteurs
+  ✘ Créer des exercices de respiration
+  ✘ Accéder au panneau d'administration
+  ✘ Gérer les utilisateurs
+
+──────────────────────────────────────────────────────────────────────────────
+  RÔLE 3 : ROLE_ADMIN (administrateur)
+──────────────────────────────────────────────────────────────────────────────
+Rôle le plus élevé, attribué manuellement.
+
+Hérite de : ROLE_REDACTOR + ROLE_USER (tous leurs droits)
+
+Permissions supplémentaires :
+  ✔ Accéder au tableau de bord EasyAdmin (/admin)
+  ✔ Créer, modifier et supprimer des exercices de respiration
+  ✔ Supprimer n'importe quelle ressource (y compris celles des autres)
+  ✔ Gérer la visibilité des ressources (toggle visible/invisible)
+  ✔ Consulter les statistiques de l'application
+  ✔ Gérer tous les utilisateurs via l'interface d'administration
+  ✔ Modifier les rôles des utilisateurs
+
+──────────────────────────────────────────────────────────────────────────────
+  Implémentation technique
+──────────────────────────────────────────────────────────────────────────────
+Fichier principal : backend/src/Entity/User.php
+
+  - Les rôles sont stockés en base de données dans un champ JSON (array PHP)
+  - La méthode getRoles() ajoute automatiquement ROLE_USER si absent
+  - La hiérarchie est gérée par Symfony Security (pas de logique custom)
+  - Les contrôleurs utilisent l'attribut PHP #[IsGranted('ROLE_X')] pour protéger
+    les routes critiques
+
+Extrait de code (User.php) :
+  public function getRoles(): array
+  {
+      $roles = $this->role;
+      $roles[] = 'ROLE_USER'; // garanti pour tous les utilisateurs
+      return array_unique($roles);
+  }
+
+Configuration security.yaml :
+  role_hierarchy:
+      ROLE_ADMIN: [ROLE_REDACTOR]
+      ROLE_REDACTOR: [ROLE_USER]
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  PARTIE 2 — CONFORMITÉ RGPD
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Le RGPD (Règlement Général sur la Protection des Données) impose plusieurs
+obligations aux applications traitant des données personnelles d'utilisateurs
+européens. Voici l'état de conformité de CesiZen.
+
+──────────────────────────────────────────────────────────────────────────────
+  POINTS CONFORMES ✔
+──────────────────────────────────────────────────────────────────────────────
+
+1. DROIT D'ACCÈS AUX DONNÉES (Art. 15 RGPD)
+   L'utilisateur peut consulter toutes ses données personnelles via :
+   - GET /api/me → retourne email, prénom, nom, rôle
+   - GET /api/me/activity → retourne :
+       • Ressources lues (titre, type)
+       • Ressources favorites (titre, type)
+       • Exercices complétés (nom, type, durée)
+
+   Fichier : backend/src/Controller/Api/AuthController.php
+
+2. DROIT À L'EFFACEMENT / DROIT À L'OUBLI (Art. 17 RGPD)
+   L'utilisateur peut supprimer son propre compte à tout moment :
+   - DELETE /api/me → suppression complète de l'entrée en base de données
+   - Toutes les données liées (favoris, lectures, exercices) sont supprimées
+     par cascade
+
+   Fichier : backend/src/Controller/Api/AuthController.php
+   Méthode : deleteMe()
+
+3. VÉRIFICATION DE L'EMAIL / CONSENTEMENT À L'INSCRIPTION (Art. 7 RGPD)
+   - À l'inscription, un email de vérification est envoyé via un lien signé
+   - Le compte est marqué isVerified = false jusqu'à confirmation
+   - Cela garantit que l'utilisateur a consenti en contrôlant son adresse email
+
+   Fichier : backend/src/Security/EmailVerifier.php
+   Bundle  : symfonycasts/verify-email-bundle v1.18
+
+4. MINIMISATION DES DONNÉES (Art. 5 RGPD)
+   Seules les données nécessaires au fonctionnement sont collectées :
+   - Prénom, nom, email, mot de passe hashé
+   - Aucune donnée de géolocalisation, numéro de téléphone, ou donnée
+     sensible n'est collectée
+
+5. TRAÇABILITÉ (horodatage) (Art. 5 RGPD - intégrité)
+   Toutes les entités disposent de timestamps automatiques :
+   - createdAt : date de création
+   - updatedAt : date de dernière modification
+   Via le trait Gedmo\TimestampableEntity
+
+──────────────────────────────────────────────────────────────────────────────
+  POINTS MANQUANTS / AXES D'AMÉLIORATION ✘
+──────────────────────────────────────────────────────────────────────────────
+
+1. BANDEAU DE CONSENTEMENT AUX COOKIES (Art. 7 RGPD)
+   ✘ Aucun bandeau cookie ni gestion du consentement n'est implémenté côté
+     frontend. Si des cookies analytiques ou de tracking sont utilisés,
+     le consentement explicite est obligatoire.
+
+2. EXPORT DES DONNÉES (Art. 20 RGPD - Portabilité)
+   ✘ L'endpoint /api/me/activity retourne les données mais pas dans un format
+     exportable standard (JSON téléchargeable, CSV, etc.).
+     À implémenter : un bouton "Exporter mes données" au format JSON/CSV.
+
+3. POLITIQUE DE CONFIDENTIALITÉ (Art. 13 RGPD)
+   ✘ Aucune page ou endpoint de politique de confidentialité n'est présent.
+     Il faut informer l'utilisateur sur : qui traite ses données, pourquoi,
+     combien de temps, et ses droits.
+
+4. ANONYMISATION (alternative à la suppression)
+   ✘ La suppression de compte efface complètement les données. Une option
+     d'anonymisation (remplacer email/nom par des valeurs neutres) pourrait
+     être préférable pour conserver les statistiques d'usage.
+
+5. JOURNALISATION DES ACCÈS AUX DONNÉES (Art. 30 RGPD)
+   ✘ Aucun journal d'audit ne trace qui a accédé à quelles données
+     et à quelle heure.
+
+6. DURÉE DE CONSERVATION (Art. 5 RGPD)
+   ✘ Aucune politique de rétention des données n'est définie.
+     Les données sont conservées indéfiniment tant que l'utilisateur ne
+     supprime pas son compte.
+
+──────────────────────────────────────────────────────────────────────────────
+  Bilan RGPD
+──────────────────────────────────────────────────────────────────────────────
+  Droits couverts  : Accès (Art.15) ✔ | Effacement (Art.17) ✔ | Minimisation ✔
+  Droits partiels  : Consentement (Art.7) — uniquement email, pas cookies
+  Droits absents   : Portabilité (Art.20), Politique de confidentialité (Art.13)
+
+  Note globale : Base solide, mais une mise en conformité complète nécessite
+  l'ajout d'une politique de confidentialité, d'un bandeau cookie et d'un
+  export des données.
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  PARTIE 3 — SÉCURITÉ DES DONNÉES
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+CesiZen implémente plusieurs couches de sécurité. Voici le détail complet.
+
+──────────────────────────────────────────────────────────────────────────────
+  1. AUTHENTIFICATION PAR JWT (JSON Web Token)
+──────────────────────────────────────────────────────────────────────────────
+Fichier : backend/config/packages/lexik_jwt_authentication.yaml
+Bundle  : lexik/jwt-authentication-bundle v3.2
+
+  - Authentification STATELESS : aucune session côté serveur
+  - Les tokens sont signés avec une paire de clés RSA (asymétrique)
+      • Clé privée : /config/jwt/private.pem (pour signer)
+      • Clé publique : /config/jwt/public.pem (pour vérifier)
+      • Protégées par passphrase via variable d'environnement JWT_PASSPHRASE
+  - Durée de vie du token : 3600 secondes (1 heure)
+  - Le token doit être envoyé dans l'en-tête HTTP : Authorization: Bearer <token>
+  - Après expiration, le client doit se reconnecter (pas de refresh token)
+
+  Avantages : résistant aux attaques CSRF, scalable, adapté aux APIs REST
+
+──────────────────────────────────────────────────────────────────────────────
+  2. HASHAGE DES MOTS DE PASSE
+──────────────────────────────────────────────────────────────────────────────
+Fichier : backend/config/packages/security.yaml
+
+  password_hashers:
+      PasswordAuthenticatedUserInterface: 'auto'
+
+  - L'algorithme 'auto' sélectionne le meilleur disponible (bcrypt ou argon2id)
+  - Les mots de passe ne sont JAMAIS stockés en clair
+  - Le hash est irréversible (one-way)
+  - En environnement de test, coût réduit à 4 (pour la rapidité des tests)
+
+──────────────────────────────────────────────────────────────────────────────
+  3. PROTECTION CSRF (Cross-Site Request Forgery)
+──────────────────────────────────────────────────────────────────────────────
+Fichier : backend/config/packages/csrf.yaml
+
+  framework:
+      form:
+          csrf_protection:
+              token_id: submit
+
+  - Tokens CSRF stateless pour les formulaires (login, logout, authenticate)
+  - Protège contre les requêtes malveillantes depuis des sites tiers
+  - L'API REST avec JWT est naturellement protégée contre CSRF (pas de cookies)
+
+──────────────────────────────────────────────────────────────────────────────
+  4. CONTRÔLE D'ACCÈS AUX ROUTES
+──────────────────────────────────────────────────────────────────────────────
+Fichier : backend/config/packages/security.yaml (section access_control)
+
+  Routes publiques (sans authentification) :
+    - POST /api/login
+    - POST /api/register
+    - GET  /api/resources (liste)
+    - GET  /api/resources/{id} (détail)
+    - GET  /api/breathing-exercices (liste)
+
+  Routes protégées :
+    - /admin/** → ROLE_ADMIN requis
+    - /api/**   → IS_AUTHENTICATED_FULLY (JWT valide requis)
+
+  Au niveau des contrôleurs, l'attribut #[IsGranted()] renforce les droits :
+    #[IsGranted('ROLE_REDACTOR')] → sur la création de ressources
+    #[IsGranted('ROLE_ADMIN')]    → sur les actions administratives
+
+──────────────────────────────────────────────────────────────────────────────
+  5. AUTORISATION AU NIVEAU MÉTIER (Business Logic)
+──────────────────────────────────────────────────────────────────────────────
+Fichier : backend/src/Controller/Api/ApiResourceController.php
+
+  En plus des rôles, la propriété des ressources est vérifiée :
+
+  $isAdmin  = in_array('ROLE_ADMIN', $user->getRoles());
+  $isAuthor = $resource->getAuthor() === $user;
+
+  if (!$isAdmin && !$isAuthor) {
+      return $this->json(['message' => 'Access denied'], 403);
+  }
+
+  → Un rédacteur ne peut modifier/supprimer QUE ses propres ressources
+  → Un admin peut tout faire
+
+──────────────────────────────────────────────────────────────────────────────
+  6. CONFIGURATION CORS (Cross-Origin Resource Sharing)
+──────────────────────────────────────────────────────────────────────────────
+Fichier : backend/config/packages/nelmio_cors.yaml
+
+  nelmio_cors:
+      defaults:
+          allow_origin: ['http://localhost:5173']
+          allow_methods: ['GET', 'OPTIONS', 'POST', 'PUT', 'PATCH', 'DELETE']
+          allow_headers: ['Content-Type', 'Authorization']
+
+  - Seul le frontend React (localhost:5173) est autorisé à appeler l'API
+  - Bloque les requêtes depuis des origines non autorisées
+  - À mettre à jour avec l'URL de production lors du déploiement
+
+──────────────────────────────────────────────────────────────────────────────
+  7. VALIDATION DES DONNÉES EN ENTRÉE
+──────────────────────────────────────────────────────────────────────────────
+Fichier : backend/src/Entity/User.php + backend/src/Form/RegistrationFormType.php
+
+  Contraintes appliquées :
+  - UniqueEntity sur l'email → pas de doublon possible
+  - NotBlank sur les champs obligatoires
+  - Length (min: 6, max: 4096) sur les mots de passe
+  - IsTrue pour la validation des conditions d'utilisation
+
+  Les contrôleurs API vérifient également les champs requis avant traitement
+  et retournent des codes HTTP appropriés (400, 422).
+
+──────────────────────────────────────────────────────────────────────────────
+  8. SÉPARATION DES ENVIRONNEMENTS
+──────────────────────────────────────────────────────────────────────────────
+  - .env          → variables de production (non versionnées)
+  - .env.test     → base de données séparée pour les tests
+  - Les secrets (JWT_PASSPHRASE, DATABASE_URL) sont en variables d'environnement
+    et non codés en dur dans le code source
+
+──────────────────────────────────────────────────────────────────────────────
+  Bilan Sécurité
+──────────────────────────────────────────────────────────────────────────────
+  Mécanisme                    | Statut
+  ─────────────────────────────────────────────────────
+  Authentification JWT RSA     | ✔ Implémenté
+  Hashage mot de passe (auto)  | ✔ Implémenté
+  Protection CSRF              | ✔ Implémenté
+  Contrôle d'accès par rôles   | ✔ Implémenté
+  Autorisation métier          | ✔ Implémenté
+  Configuration CORS           | ✔ Implémenté (dev)
+  Validation des entrées       | ✔ Implémenté
+  Vérification email           | ✔ Implémenté
+  Séparation des environnements| ✔ Implémenté
+  HTTPS / TLS                  | ⚠ À configurer en production
+  Rate limiting / Brute force  | ✘ Non implémenté
+  Journalisation de sécurité   | ✘ Non implémenté
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  PARTIE 4 — RÉSUMÉ DES TESTS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Framework : PHPUnit 12.5
+Config    : backend/phpunit.dist.xml
+Dossier   : backend/tests/
+
+Structure :
+  backend/tests/
+  ├── Unit/
+  │   ├── UserTest.php                 (16 tests)
+  │   ├── BreathingExerciceTest.php    (14 tests)
+  │   └── ResourceTest.php            (11 tests)
+  └── Functional/
+      ├── AuthApiTest.php              (9 tests)
+      ├── ResourceApiTest.php          (11 tests)
+      └── BreathingExerciceApiTest.php (8 tests)
+
+  TOTAL : 69 tests
+
+──────────────────────────────────────────────────────────────────────────────
+  TESTS UNITAIRES (dossier tests/Unit/)
+──────────────────────────────────────────────────────────────────────────────
+Les tests unitaires vérifient les entités en isolation, sans base de données.
+Ils testent la logique pure : getters, setters, valeurs par défaut, collections.
+
+━━━ UserTest.php — 16 tests ━━━
+Fichier testé : src/Entity/User.php
+
+  Tests des rôles :
+  [✔] testDefaultRolesIncludeRoleUser
+        → getRoles() retourne toujours au moins ROLE_USER
+
+  [✔] testSetRoleAdmin
+        → On peut affecter ROLE_ADMIN à un utilisateur
+
+  [✔] testSetRoleRedactor
+        → On peut affecter ROLE_REDACTOR à un utilisateur
+
+  [✔] testRolesAreUnique
+        → Les doublons de rôles sont éliminés (array_unique)
+
+  Tests des propriétés :
+  [✔] testSetAndGetEmail
+  [✔] testSetAndGetFirstname
+  [✔] testSetAndGetLastname
+  [✔] testSetAndGetPassword
+  [✔] testIsVerifiedDefaultsFalse
+        → isVerified est false par défaut à la création
+  [✔] testSetIsVerified
+        → On peut changer la valeur de isVerified
+
+  Tests des collections :
+  [✔] testAddReadResource / testRemoveReadResource
+        → Ajout et suppression depuis la collection readResources
+  [✔] testAddFavoriteResource / testRemoveFavoriteResource
+        → Ajout et suppression depuis la collection favoriteResources
+  [✔] testAddExerciceDone / testRemoveExerciceDone
+        → Ajout et suppression depuis la collection exerciceDone
+  [✔] testAddReadResourceIsIdempotent
+        → Ajouter deux fois la même ressource ne crée pas de doublon
+
+━━━ BreathingExerciceTest.php — 14 tests ━━━
+Fichier testé : src/Entity/BreathingExercice.php
+
+  Tests des propriétés de base :
+  [✔] testSetAndGetName
+  [✔] testSetAndGetDuration
+  [✔] testSetAndGetDescription
+  [✔] testSetAndGetType
+
+  Tests des propriétés de timing :
+  [✔] testSetAndGetTimeInhale
+  [✔] testSetAndGetTimeHold
+  [✔] testTimeHoldCanBeNull
+        → Le temps de rétention (hold) est optionnel, peut être null
+  [✔] testSetAndGetTimeExhale
+  [✔] testSetAndGetNumberCycle
+
+  Tests de logique :
+  [✔] testTotalCycleTime
+        → Calcul du temps total : (inhale + hold + exhale) × numberCycle
+
+  Tests des collections :
+  [✔] testAddUser / testRemoveUser
+        → Suivi des utilisateurs ayant complété l'exercice
+  [✔] testAddUserIsIdempotent
+        → Pas de doublon si le même utilisateur est ajouté deux fois
+
+━━━ ResourceTest.php — 11 tests ━━━
+Fichier testé : src/Entity/Resource.php
+
+  Tests des propriétés :
+  [✔] testSetAndGetTitle
+  [✔] testSetAndGetText
+  [✔] testSetAndGetType
+  [✔] testSetAndGetImage
+  [✔] testImageCanBeNull
+        → L'image est optionnelle
+  [✔] testVisibleDefaultsTrue
+        → Une ressource est visible par défaut à la création
+  [✔] testSetVisible
+        → On peut rendre une ressource invisible
+
+  Tests des relations :
+  [✔] testSetAndGetAuthor
+        → Une ressource est liée à son auteur (User)
+
+  Tests des collections :
+  [✔] testReadByUsersIsEmptyByDefault
+  [✔] testFavoritedByUsersIsEmptyByDefault
+  [✔] testAddReadByUser
+        → On peut enregistrer qu'un utilisateur a lu une ressource
+
+──────────────────────────────────────────────────────────────────────────────
+  TESTS FONCTIONNELS (dossier tests/Functional/)
+──────────────────────────────────────────────────────────────────────────────
+Les tests fonctionnels simulent de vraies requêtes HTTP contre l'API.
+Ils utilisent un client de test Symfony (KernelBrowser) et une base de données
+de test dédiée. Chaque test crée ses données, les utilise, puis les nettoie.
+
+Technologie :
+  - Étend WebTestCase (Symfony)
+  - static::createClient() pour simuler les requêtes HTTP
+  - UserPasswordHasherInterface pour hasher les mots de passe en test
+  - EntityManagerInterface pour les opérations directes en base
+  - tearDown() avec suppression DQL pour nettoyer après chaque test
+
+━━━ AuthApiTest.php — 9 tests ━━━
+Couverture : Inscription, Connexion, Profil utilisateur
+
+  [✔] testRegisterSuccess
+        → POST /api/register avec données valides → 201 Created
+        → Le compte est bien créé en base
+
+  [✔] testRegisterMissingFields
+        → POST /api/register sans email/mot de passe → 400 Bad Request
+        → Message d'erreur retourné
+
+  [✔] testRegisterDuplicateEmail
+        → POST /api/register avec un email déjà existant → 422 Unprocessable
+        → L'unicité de l'email est bien enforced
+
+  [✔] testLoginSuccess
+        → POST /api/login avec bons identifiants → 200 OK
+        → Réponse contient un token JWT valide
+
+  [✔] testLoginWrongPassword
+        → POST /api/login avec mauvais mot de passe → 401 Unauthorized
+
+  [✔] testLoginWrongEmail
+        → POST /api/login avec email inexistant → 401 Unauthorized
+
+  [✔] testMeEndpointRequiresAuth
+        → GET /api/me sans token → 401 Unauthorized
+
+  [✔] testMeEndpointReturnsUserInfo
+        → GET /api/me avec token valide → 200 OK
+        → Retourne email, prénom, nom de l'utilisateur connecté
+
+  [✔] testDeleteMe
+        → DELETE /api/me avec token valide → 200 OK
+        → Le compte est supprimé de la base de données
+
+━━━ ResourceApiTest.php — 11 tests ━━━
+Couverture : CRUD Ressources, permissions par rôle, favoris, lectures
+
+  Utilisateurs de test créés : user (ROLE_USER), redactor (ROLE_REDACTOR),
+                               admin (ROLE_ADMIN)
+
+  [✔] testListResourcesIsPublic
+        → GET /api/resources sans token → 200 OK (liste publique)
+
+  [✔] testShowResourceRequiresAuth
+        → GET /api/resources/{id} sans token → 401 Unauthorized
+
+  [✔] testCreateResourceRequiresRedactorRole
+        → POST /api/resources avec ROLE_USER → 403 Forbidden
+
+  [✔] testRedactorCanCreateResource
+        → POST /api/resources avec ROLE_REDACTOR → 201 Created
+        → La ressource est bien enregistrée
+
+  [✔] testMarkResourceAsRead
+        → POST /api/resources/{id}/read avec token user → 200 OK
+        → La ressource apparaît dans la liste "lues" de l'utilisateur
+
+  [✔] testToggleFavorite
+        → POST /api/resources/{id}/favorite → ajoute aux favoris
+        → Re-POST → retire des favoris (comportement toggle)
+
+  [✔] testAdminCanDeleteAnyResource
+        → DELETE /api/resources/{id} avec ROLE_ADMIN → 204 No Content
+        → Suppression réussie même si l'admin n'est pas l'auteur
+
+  [✔] testUserCannotDeleteOthersResource
+        → DELETE /api/resources/{id} avec un user non auteur → 403 Forbidden
+
+  [✔] testAuthorCanDeleteOwnResource
+        → DELETE /api/resources/{id} par l'auteur → 204 No Content
+
+  [✔] testAdminCanToggleVisibility
+        → PUT /api/resources/{id}/visibility avec ROLE_ADMIN → 200 OK
+        → La visibilité bascule (true ↔ false)
+
+  [✔] testGetResourceWithVisibilityFilter
+        → Les ressources invisibles n'apparaissent pas pour les non-admins
+
+━━━ BreathingExerciceApiTest.php — 8 tests ━━━
+Couverture : CRUD Exercices, permissions, complétion
+
+  Utilisateurs de test créés : user (ROLE_USER), admin (ROLE_ADMIN)
+
+  [✔] testListRequiresAuthentication
+        → GET /api/breathing-exercices sans token → 401 Unauthorized
+
+  [✔] testListReturnsExercices
+        → GET /api/breathing-exercices avec token → 200 OK
+        → Retourne la liste des exercices disponibles
+
+  [✔] testUserCannotCreateExercice
+        → POST /api/breathing-exercices avec ROLE_USER → 403 Forbidden
+
+  [✔] testAdminCanCreateExercice
+        → POST /api/breathing-exercices avec ROLE_ADMIN → 201 Created
+        → L'exercice est bien enregistré avec ses propriétés
+
+  [✔] testMarkExerciceAsComplete
+        → POST /api/breathing-exercices/{id}/complete avec token user → 200 OK
+        → L'exercice apparaît dans l'activité de l'utilisateur
+
+  [✔] testAdminCanDeleteExercice
+        → DELETE /api/breathing-exercices/{id} avec ROLE_ADMIN → 204 No Content
+
+  [✔] testUserCannotDeleteExercice
+        → DELETE /api/breathing-exercices/{id} avec ROLE_USER → 403 Forbidden
+
+  [✔] testExerciceDataIsReturnedCorrectly
+        → Vérification que les champs (name, duration, type, timings)
+          sont correctement retournés dans la réponse JSON
+
+──────────────────────────────────────────────────────────────────────────────
+  COUVERTURE GLOBALE DES TESTS
+──────────────────────────────────────────────────────────────────────────────
+
+  Ce qui est couvert :
+  ✔ Authentification (JWT, inscription, connexion, déconnexion)
+  ✔ Autorisation (contrôle d'accès par rôle sur toutes les routes clés)
+  ✔ CRUD complet : Ressources + Exercices de respiration
+  ✔ Logique métier (propriété des ressources, favoris, lectures, complétion)
+  ✔ Gestion des erreurs (400, 401, 403, 404, 422)
+  ✔ Valeurs par défaut et invariants des entités
+  ✔ Idempotence des opérations (favoris toggle, ajout de collection)
+  ✔ Suppression de compte utilisateur
+
+  Ce qui n'est pas encore couvert :
+  ✘ Tests du panneau d'administration EasyAdmin
+  ✘ Tests du workflow de vérification d'email
+  ✘ Tests des statistiques admin
+  ✘ Tests de performance / charge
+  ✘ Tests RGPD (export de données, anonymisation)
+  ✘ Tests de sécurité spécifiques (injection, XSS)
+
+──────────────────────────────────────────────────────────────────────────────
+  COMMANDE POUR LANCER LES TESTS
+──────────────────────────────────────────────────────────────────────────────
+
+  # Tous les tests
+  cd backend && php bin/phpunit
+
+  # Tests unitaires uniquement
+  php bin/phpunit tests/Unit/
+
+  # Tests fonctionnels uniquement
+  php bin/phpunit tests/Functional/
+
+  # Un fichier spécifique
+  php bin/phpunit tests/Unit/UserTest.php
+
+  # Avec couverture de code (nécessite Xdebug)
+  php bin/phpunit --coverage-html coverage/
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  FIN DU RAPPORT — CesiZen | Généré le 21/06/2026
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━

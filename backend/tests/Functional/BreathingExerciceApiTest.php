@@ -71,10 +71,10 @@ class BreathingExerciceApiTest extends WebTestCase
         return $ex;
     }
 
-    public function testListRequiresAuthentication(): void
+    public function testListIsPublic(): void
     {
         $this->client->request('GET', '/api/breathing-exercices');
-        $this->assertResponseStatusCodeSame(401);
+        $this->assertResponseIsSuccessful();
     }
 
     public function testListReturnsExercices(): void

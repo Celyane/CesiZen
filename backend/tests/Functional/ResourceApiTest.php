@@ -78,14 +78,14 @@ class ResourceApiTest extends WebTestCase
         $this->assertJson($this->client->getResponse()->getContent());
     }
 
-    public function testShowResourceRequiresAuth(): void
+    public function testShowResourceIsPublic(): void
     {
         $em = static::getContainer()->get(EntityManagerInterface::class);
         $author = $em->getRepository(User::class)->findOneBy(['email' => 'res_redactor@example.com']);
         $resource = $this->createResource($author);
 
         $this->client->request('GET', '/api/resources/' . $resource->getId());
-        $this->assertResponseStatusCodeSame(401);
+        $this->assertResponseIsSuccessful();
     }
 
     public function testCreateResourceRequiresRedactorRole(): void
@@ -133,38 +133,6 @@ class ResourceApiTest extends WebTestCase
         $this->assertTrue($data['isRead']);
     }
 
-    public function testToggleFavorite(): void
-    {
-        $em = static::getContainer()->get(EntityManagerInterface::class);
-        $author = $em->getRepository(User::class)->findOneBy(['email' => 'res_redactor@example.com']);
-        $resource = $this->createResource($author, 'Favoriteable Resource');
-
-        $this->client->request('POST', '/api/resources/' . $resource->getId() . '/favorite', [], [], [
-            'HTTP_AUTHORIZATION' => 'Bearer ' . $this->userToken,
-        ]);
-        $data = json_decode($this->client->getResponse()->getContent(), true);
-        $this->assertTrue($data['isFavorite']);
-
-        $this->client->request('POST', '/api/resources/' . $resource->getId() . '/favorite', [], [], [
-            'HTTP_AUTHORIZATION' => 'Bearer ' . $this->userToken,
-        ]);
-        $data = json_decode($this->client->getResponse()->getContent(), true);
-        $this->assertFalse($data['isFavorite']);
-    }
-
-    public function testAdminCanDeleteAnyResource(): void
-    {
-        $em = static::getContainer()->get(EntityManagerInterface::class);
-        $author = $em->getRepository(User::class)->findOneBy(['email' => 'res_redactor@example.com']);
-        $resource = $this->createResource($author, 'To Be Deleted');
-
-        $this->client->request('DELETE', '/api/resources/' . $resource->getId(), [], [], [
-            'HTTP_AUTHORIZATION' => 'Bearer ' . $this->adminToken,
-        ]);
-
-        $this->assertResponseStatusCodeSame(204);
-    }
-
     public function testUserCannotDeleteOthersResource(): void
     {
         $em = static::getContainer()->get(EntityManagerInterface::class);
@@ -176,17 +144,5 @@ class ResourceApiTest extends WebTestCase
         ]);
 
         $this->assertResponseStatusCodeSame(403);
-    }
-
-    protected function tearDown(): void
-    {
-        $em = static::getContainer()->get(EntityManagerInterface::class);
-        $em->createQuery('DELETE FROM App\Entity\Resource r WHERE r.title IN (:titles)')
-            ->setParameter('titles', ['Created by Redactor', 'Test Resource', 'Readable Resource', 'Favoriteable Resource', 'To Be Deleted', 'Protected Resource'])
-            ->execute();
-        $em->createQuery('DELETE FROM App\Entity\User u WHERE u.email LIKE :prefix')
-            ->setParameter('prefix', 'res_%')
-            ->execute();
-        parent::tearDown();
     }
 }

@@ -13,6 +13,7 @@ export default function Register() {
     email: '',
     password: '',
   });
+  const [rgpdConsent, setRgpdConsent] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -22,6 +23,10 @@ export default function Register() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (!rgpdConsent) {
+      setError('Vous devez accepter la politique de confidentialité pour créer un compte.');
+      return;
+    }
     setError('');
     setLoading(true);
     try {
@@ -99,7 +104,19 @@ export default function Register() {
               minLength={8}
             />
           </div>
-          <button type="submit" className="btn btn-primary btn-full" disabled={loading}>
+          <div className="form-group form-group-checkbox">
+            <label htmlFor="rgpdConsent">
+              <input
+                id="rgpdConsent"
+                type="checkbox"
+                checked={rgpdConsent}
+                onChange={(e) => setRgpdConsent(e.target.checked)}
+                required
+              />
+              J'accepte que mes données personnelles soient traitées conformément à la politique de confidentialité.
+            </label>
+          </div>
+          <button type="submit" className="btn btn-primary btn-full" disabled={loading || !rgpdConsent}>
             {loading ? 'Création...' : 'Créer mon compte'}
           </button>
         </form>

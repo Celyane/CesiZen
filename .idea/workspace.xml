@@ -6,24 +6,10 @@
   <component name="ChangeListManager">
     <list default="true" id="617dda91-672f-49c9-ba78-bd1863f36df9" name="Changes" comment="">
       <changelist_data name="Célyane" email="celyanecc@gmail.com" date="1770379072000" automatic="true" />
-      <change afterPath="$PROJECT_DIR$/.idea/inspectionProfiles/Project_Default.xml" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/frontend/.vite/deps/_metadata.json" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/frontend/.vite/deps/package.json" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/frontend/public/cesiZen.png" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/cesiZen.iml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/cesiZen.iml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/php.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/php.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/backend/.idea/vcs.xml" beforeDir="false" afterPath="$PROJECT_DIR$/backend/.idea/vcs.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/backend/config/packages/security.yaml" beforeDir="false" afterPath="$PROJECT_DIR$/backend/config/packages/security.yaml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/backend/src/Controller/Api/ApiBreathingExerciceController.php" beforeDir="false" afterPath="$PROJECT_DIR$/backend/src/Controller/Api/ApiBreathingExerciceController.php" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/backend/src/Controller/Api/ApiResourceController.php" beforeDir="false" afterPath="$PROJECT_DIR$/backend/src/Controller/Api/ApiResourceController.php" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/frontend/src/App.jsx" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/src/App.jsx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/frontend/src/api/axios.js" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/src/api/axios.js" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/frontend/src/components/Navbar.jsx" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/src/components/Navbar.jsx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/frontend/src/index.css" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/src/index.css" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/frontend/src/pages/BreathingExerciceDetail.jsx" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/src/pages/BreathingExerciceDetail.jsx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/frontend/src/pages/Home.jsx" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/src/pages/Home.jsx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/frontend/vite.config.js" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/vite.config.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend/src/Controller/Api/ApiUserController.php" beforeDir="false" afterPath="$PROJECT_DIR$/backend/src/Controller/Api/ApiUserController.php" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/frontend/src/api/users.js" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/src/api/users.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/frontend/src/pages/AdminUsers.jsx" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/src/pages/AdminUsers.jsx" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -405,6 +391,10 @@
       <workItem from="1779800749059" duration="1014000" />
       <workItem from="1779801935146" duration="812000" />
       <workItem from="1779863730944" duration="597000" />
+      <workItem from="1781621233215" duration="2653000" />
+      <workItem from="1781627292309" duration="20000" />
+      <workItem from="1782072991550" duration="2067000" />
+      <workItem from="1782112443052" duration="3367000" />
     </task>
     <servers />
   </component>

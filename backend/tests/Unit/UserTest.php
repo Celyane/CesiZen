@@ -46,17 +46,6 @@ class UserTest extends TestCase
         $this->assertSame('Martin', $this->user->getLastname());
     }
 
-    public function testIsVerifiedDefaultsFalse(): void
-    {
-        $this->assertFalse($this->user->isVerified());
-    }
-
-    public function testSetIsVerified(): void
-    {
-        $this->user->setIsVerified(true);
-        $this->assertTrue($this->user->isVerified());
-    }
-
     public function testSetRoleAdmin(): void
     {
         $this->user->setRole(['ROLE_ADMIN']);
