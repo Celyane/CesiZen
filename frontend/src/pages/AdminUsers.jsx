@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { getUsers, createUser, updateUserRole, deleteUser } from '../api/users';
+import { getUsers, createUser, updateUserRole, toggleUserActive, deleteUser } from '../api/users';
 import { useAuth } from '../context/AuthContext';
 import AdminLayout from '../components/AdminLayout';
 
@@ -69,6 +69,20 @@ export default function AdminUsers() {
       setError(msg);
     } finally {
       setFormLoading(false);
+    }
+  };
+
+  const handleToggleActive = async (userId) => {
+    setSuccessMsg('');
+    try {
+      const res = await toggleUserActive(userId);
+      setUsers((prev) =>
+        prev.map((u) => (u.id === userId ? { ...u, isActive: res.data.isActive } : u))
+      );
+      setSuccessMsg(res.data.isActive ? 'Compte réactivé.' : 'Compte désactivé.');
+      setTimeout(() => setSuccessMsg(''), 3000);
+    } catch {
+      setError('Erreur lors de la modification du statut du compte.');
     }
   };
 
@@ -178,6 +192,7 @@ export default function AdminUsers() {
               <th>Nom</th>
               <th>Email</th>
               <th>Rôle</th>
+              <th>Statut</th>
               <th>Actions</th>
             </tr>
           </thead>
@@ -186,7 +201,7 @@ export default function AdminUsers() {
               const primaryRole = getPrimaryRole(u.roles);
               const isSelf = u.id === currentUser?.id;
               return (
-                <tr key={u.id} className={isSelf ? 'row-self' : ''}>
+                <tr key={u.id} className={`${isSelf ? 'row-self' : ''} ${u.isActive === false ? 'row-inactive' : ''}`}>
                   <td>{u.id}</td>
                   <td>
                     {u.firstname} {u.lastname}
@@ -206,6 +221,19 @@ export default function AdminUsers() {
                     </select>
                   </td>
                   <td>
+                    <span className={`badge ${u.isActive === false ? 'badge-inactive' : 'badge-active'}`}>
+                      {u.isActive === false ? 'Désactivé' : 'Actif'}
+                    </span>
+                  </td>
+                  <td className="actions-cell">
+                    <button
+                      className={`btn btn-sm ${u.isActive === false ? 'btn-success' : 'btn-warning'}`}
+                      onClick={() => handleToggleActive(u.id)}
+                      disabled={isSelf}
+                      title={isSelf ? 'Vous ne pouvez pas modifier votre propre compte' : (u.isActive === false ? 'Réactiver' : 'Désactiver')}
+                    >
+                      {u.isActive === false ? 'Réactiver' : 'Désactiver'}
+                    </button>
                     <button
                       className="btn btn-sm btn-danger"
                       onClick={() => handleDelete(u.id)}

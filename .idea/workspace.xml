@@ -6,9 +6,16 @@
   <component name="ChangeListManager">
     <list default="true" id="617dda91-672f-49c9-ba78-bd1863f36df9" name="Changes" comment="">
       <changelist_data name="Célyane" email="celyanecc@gmail.com" date="1770379072000" automatic="true" />
+      <change beforePath="$PROJECT_DIR$/.gitignore" beforeDir="false" afterPath="$PROJECT_DIR$/.gitignore" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/RAPPORT_CESIZEN.txt" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend/.env" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend/config/packages/security.yaml" beforeDir="false" afterPath="$PROJECT_DIR$/backend/config/packages/security.yaml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/backend/src/Controller/Api/ApiUserController.php" beforeDir="false" afterPath="$PROJECT_DIR$/backend/src/Controller/Api/ApiUserController.php" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend/src/Controller/RegistrationController.php" beforeDir="false" afterPath="$PROJECT_DIR$/backend/src/Controller/RegistrationController.php" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend/src/Entity/User.php" beforeDir="false" afterPath="$PROJECT_DIR$/backend/src/Entity/User.php" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/frontend/src/api/users.js" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/src/api/users.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/frontend/src/index.css" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/src/index.css" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/frontend/src/pages/AdminUsers.jsx" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/src/pages/AdminUsers.jsx" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
@@ -394,7 +401,9 @@
       <workItem from="1781621233215" duration="2653000" />
       <workItem from="1781627292309" duration="20000" />
       <workItem from="1782072991550" duration="2067000" />
-      <workItem from="1782112443052" duration="3367000" />
+      <workItem from="1782112443052" duration="9005000" />
+      <workItem from="1787154515394" duration="1205000" />
+      <workItem from="1787237501316" duration="7560000" />
     </task>
     <servers />
   </component>
