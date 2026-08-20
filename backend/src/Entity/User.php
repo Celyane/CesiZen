@@ -41,6 +41,9 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     #[ORM\Column]
     private bool $isVerified = false;
 
+    #[ORM\Column]
+    private bool $isActive = true;
+
     /** @var Collection<int, BreathingExercice> */
     #[ORM\ManyToMany(targetEntity: BreathingExercice::class, inversedBy: 'users')]
     #[ORM\JoinTable(name: 'user_breathing_exercice')]
@@ -145,6 +148,17 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     public function setIsVerified(bool $isVerified): static
     {
         $this->isVerified = $isVerified;
+        return $this;
+    }
+
+    public function isActive(): bool
+    {
+        return $this->isActive;
+    }
+
+    public function setIsActive(bool $isActive): static
+    {
+        $this->isActive = $isActive;
         return $this;
     }
 

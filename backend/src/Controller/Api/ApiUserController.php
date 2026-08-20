@@ -27,6 +27,7 @@ class ApiUserController extends AbstractController
             'lastname' => $user->getLastname(),
             'roles' => $user->getRoles(),
             'isVerified' => $user->isVerified(),
+            'isActive' => $user->isActive(),
             'createdAt' => $user->getCreatedAt()?->format('Y-m-d H:i:s'),
         ];
     }
@@ -97,6 +98,22 @@ class ApiUserController extends AbstractController
         }
 
         $user->setRole([$role]);
+        $em->flush();
+
+        return $this->json($this->serialize($user));
+    }
+
+    #[Route('/{id}/toggle-active', name: 'api_user_toggle_active', methods: ['PUT'])]
+    public function toggleActive(User $user, EntityManagerInterface $em): JsonResponse
+    {
+        /** @var User $currentUser */
+        $currentUser = $this->getUser();
+
+        if ($user->getId() === $currentUser->getId()) {
+            return $this->json(['message' => 'Cannot deactivate your own account'], Response::HTTP_BAD_REQUEST);
+        }
+
+        $user->setIsActive(!$user->isActive());
         $em->flush();
 
         return $this->json($this->serialize($user));
