@@ -1,0 +1,43 @@
+version: 2
+updates:
+  # Dépendances PHP du backend
+  - package-ecosystem: "composer"
+    directory: "/backend"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 5
+    labels: ["évolution"]
+    commit-message:
+      prefix: "chore"
+
+  # Dépendances JavaScript du frontend
+  - package-ecosystem: "npm"
+    directory: "/frontend"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 5
+    labels: ["évolution"]
+    commit-message:
+      prefix: "chore"
+
+  # Images Docker de base
+  - package-ecosystem: "docker"
+    directory: "/backend"
+    schedule:
+      interval: "monthly"
+    labels: ["évolution"]
+
+  - package-ecosystem: "docker"
+    directory: "/frontend"
+    schedule:
+      interval: "monthly"
+    labels: ["évolution"]
+
+  # Actions utilisées par la CI
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "monthly"
+    labels: ["évolution"]
