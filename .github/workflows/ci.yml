@@ -1,0 +1,72 @@
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+jobs:
+  tests-backend:
+    name: Tests backend (PHPUnit)
+    runs-on: ubuntu-latest
+
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_DATABASE: cesizen_test
+          MYSQL_ROOT_PASSWORD: root
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h localhost -uroot -proot"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=20
+
+    steps:
+      - name: Récupération du code
+        uses: actions/checkout@v4
+
+      - name: Installation de PHP 8.4
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          extensions: pdo_mysql, intl, zip
+          coverage: none
+
+      - name: Cache des dépendances Composer
+        uses: actions/cache@v4
+        with:
+          path: backend/vendor
+          key: composer-${{ hashFiles('backend/composer.lock') }}
+
+      - name: Installation des dépendances
+        working-directory: backend
+        run: composer install --no-interaction --prefer-dist
+
+      - name: Génération des clés JWT
+        working-directory: backend
+        run: php bin/console lexik:jwt:generate-keypair --skip-if-exists
+        env:
+          APP_ENV: test
+          APP_SECRET: ci_secret_non_sensible
+
+      - name: Préparation de la base de test
+        working-directory: backend
+        run: |
+          php bin/console doctrine:database:create --if-not-exists --no-interaction
+          php bin/console doctrine:migrations:migrate --no-interaction --allow-no-migration
+        env:
+          APP_ENV: test
+          APP_SECRET: ci_secret_non_sensible
+          DATABASE_URL: "mysql://root:root@127.0.0.1:3306/cesizen_test?serverVersion=8.0&charset=utf8mb4"
+
+      - name: Exécution des tests
+        working-directory: backend
+        run: php bin/phpunit
+        env:
+          APP_ENV: test
+          APP_SECRET: ci_secret_non_sensible
+          DATABASE_URL: "mysql://root:root@127.0.0.1:3306/cesizen_test?serverVersion=8.0&charset=utf8mb4"
