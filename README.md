@@ -93,3 +93,4 @@ cesizen/
 ├── backend/    Symfony 8 — API REST, entités, migrations, tests PHPUnit
 └── frontend/   React + Vite — interface utilisateur
 ```
+![CI](https://github.com/Celyane/CesiZen/actions/workflows/ci.yml/badge.svg)
