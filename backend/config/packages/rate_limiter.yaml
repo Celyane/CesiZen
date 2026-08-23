@@ -1,0 +1,6 @@
+framework:
+    rate_limiter:
+        register_ip:
+            policy: 'sliding_window'
+            limit: 5
+            interval: '1 minute'

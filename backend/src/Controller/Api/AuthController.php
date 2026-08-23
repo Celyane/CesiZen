@@ -8,8 +8,11 @@ use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\DependencyInjection\Attribute\Autowire;
 use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
+use Symfony\Component\RateLimiter\RateLimiterFactory;
 use Symfony\Component\Routing\Attribute\Route;
+use Symfony\Component\Validator\Constraints as Assert;
 use Symfony\Component\Validator\Validator\ValidatorInterface;
 
 #[Route('/api')]
@@ -20,8 +23,13 @@ class AuthController extends AbstractController
         Request $request,
         UserPasswordHasherInterface $hasher,
         EntityManagerInterface $em,
-        ValidatorInterface $validator
+        ValidatorInterface $validator,
+        #[Autowire(service: 'limiter.register_ip')] RateLimiterFactory $registerIpLimiter
     ): JsonResponse {
+        if (!$registerIpLimiter->create($request->getClientIp())->consume(1)->isAccepted()) {
+            return $this->json(['message' => 'Trop de tentatives, réessayez plus tard'], Response::HTTP_TOO_MANY_REQUESTS);
+        }
+
         $data = json_decode($request->getContent(), true);
 
         if (!$data) {
@@ -33,6 +41,21 @@ class AuthController extends AbstractController
             if (empty($data[$field])) {
                 return $this->json(['message' => "Field '$field' is required"], Response::HTTP_BAD_REQUEST);
             }
+        }
+
+        $passwordErrors = $validator->validate($data['password'], [
+            new Assert\Length(min: 8, max: 4096, minMessage: 'Le mot de passe doit contenir au moins {{ limit }} caractères'),
+            new Assert\Regex(
+                pattern: '/^(?=.*[A-Za-z])(?=.*\d).+$/',
+                message: 'Le mot de passe doit contenir au moins une lettre et un chiffre'
+            ),
+        ]);
+        if (count($passwordErrors) > 0) {
+            $messages = [];
+            foreach ($passwordErrors as $error) {
+                $messages[] = $error->getMessage();
+            }
+            return $this->json(['message' => implode(', ', $messages)], Response::HTTP_UNPROCESSABLE_ENTITY);
         }
 
         $user = new User();

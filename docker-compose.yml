@@ -4,8 +4,8 @@ services:
     environment:
       MYSQL_DATABASE: cesizen
       MYSQL_USER: cesizen
-      MYSQL_PASSWORD: cesizen
-      MYSQL_ROOT_PASSWORD: root
+      MYSQL_PASSWORD: ${DB_PASSWORD}
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD}
     ports:
       - "3307:3306"
     volumes:
@@ -21,8 +21,8 @@ services:
       - "8080:80"
     environment:
       APP_ENV: prod
-      APP_SECRET: "a_changer_avant_la_prod"
-      DATABASE_URL: "mysql://cesizen:cesizen@db:3306/cesizen?serverVersion=8.0&charset=utf8mb4"
+      APP_SECRET: ${APP_SECRET}
+      DATABASE_URL: "mysql://cesizen:${DB_PASSWORD}@db:3306/cesizen?serverVersion=8.0&charset=utf8mb4"
     depends_on:
       db:
         condition: service_healthy
