@@ -42,7 +42,7 @@ Analyse organisée selon l'OWASP Top 10 (2021), rapportée concrètement au code
   `#[IsGranted('ROLE_REDACTOR')]` sur la création de ressource.
 
 **Reste exposé** :
-- `User::$isVerified` (`backend/src/Entity/User.php:42`) n'est vérifié nulle part — ni dans
+- `User::$isVerified` (`backend/src/Entity/User.php:45`) n'est vérifié nulle part — ni dans
   `access_control`, ni dans un contrôleur. Un compte créé avec un email qu'on ne possède pas
   reste pleinement fonctionnel. **[RECOMMANDÉ]** bloquer les actions sensibles tant que
   `isVerified` est faux, ou assumer et documenter ce choix comme volontaire.
@@ -78,8 +78,8 @@ ce qui exclut l'injection SQL classique sur ce vecteur.
 
 **Reste exposé** :
 - Pas de mécanisme de révocation de JWT ni de refresh token (pas de
-  `gesdinet/jwt-refresh-token-bundle` dans `backend/composer.json`). Point assumé, détaillé en
-  section 7 du présent document (limites).
+  `gesdinet/jwt-refresh-token-bundle` dans `backend/composer.json`). Point assumé, détaillé en Q3
+  (« Questions probables du jury »).
 - Consentement RGPD recueilli côté interface (`frontend/src/pages/Register.jsx:107-118`) mais
   jamais transmis à l'API ni stocké : `form` posté vers `/api/register` (ligne 33) ne contient
   pas le champ `rgpdConsent`, et `User.php` n'a aucun champ de consentement. La case bloque la
@@ -90,8 +90,19 @@ ce qui exclut l'injection SQL classique sur ce vecteur.
 **Couvert (corrigé pendant cet audit)** :
 - En-têtes de sécurité HTTP absents avant correction ; ajoutés dans
   `backend/apache-vhost.conf` et `frontend/nginx.conf` (`X-Content-Type-Options`,
-  `X-Frame-Options`, `Referrer-Policy`, `Permissions-Policy`, `Strict-Transport-Security`).
-  Vérifiés par `curl -I` sur les deux services après reconstruction des images.
+  `X-Frame-Options`, `Referrer-Policy`, `Permissions-Policy`, `Strict-Transport-Security`,
+  `Content-Security-Policy`). Vérifiés par `curl -I` sur les deux services après reconstruction
+  des images.
+- `Content-Security-Policy` scindée en deux politiques dans `backend/apache-vhost.conf` :
+  `default-src 'none'` sur l'ensemble de l'API (elle ne sert que du JSON), et une exception ciblée
+  sur `/api/docs` (`default-src 'self'; style-src 'self'; script-src 'self' 'unsafe-inline'`) car
+  cette route sert l'UI Swagger d'API Platform — CSS/JS depuis `/assets` en même origine plus un
+  bloc `<script>` inline de bootstrap. Une première version avec `'none'` partout cassait cette
+  UI (constaté par inspection du HTML servi, `<script id="swagger-data" type="application/json">`
+  inline) ; corrigée avant validation finale. Distinction faite via `SetEnvIf Request_URI` +
+  `Header ... env=` (un essai avec `<If>`/`<LocationMatch>` n'a pas produit l'ordre de priorité
+  attendu sur cette version d'Apache — abandonné au profit du mécanisme `SetEnvIf`, plus ancien
+  mais fiable pour ce cas).
 - CORS restreint à une origine unique, désormais pilotée par la variable d'environnement
   `CORS_ALLOW_ORIGIN` (`backend/config/packages/nelmio_cors.yaml`) au lieu d'une valeur figée
   dans le code — permet de configurer une vraie origine de production sans modification de code.
@@ -99,10 +110,6 @@ ce qui exclut l'injection SQL classique sur ce vecteur.
   `backend/config/bundles.php` — absentes de l'image construite en environnement `prod`.
 
 **Reste exposé** :
-- Pas de `Content-Security-Policy`. Non ajoutée volontairement pendant cet audit : `/api/docs`
-  sert une documentation API Platform qui peut être rendue en HTML par le navigateur, et une CSP
-  mal calibrée risquait de la casser sans test préalable. **[RECOMMANDÉ]**, à définir et tester
-  spécifiquement.
 - L'image Docker backend ne dispose d'aucun `.dockerignore` : `COPY . .` dans
   `backend/Dockerfile` copie le `vendor/` du poste de développement (avec dépendances `dev`,
   dont PHPUnit) par-dessus l'installation `--no-dev` faite à l'étape précédente, ce qui annule
@@ -134,7 +141,7 @@ rythme hebdomadaire de Dependabot. **[RECOMMANDÉ]**
   pendant cet audit, voir section 5).
 
 **Reste exposé** : stockage du JWT en `localStorage` côté React ; absence de refresh token —
-ces deux points sont assumés et expliqués en section 7.
+ces deux points sont assumés et expliqués en Q2/Q3 (« Questions probables du jury »).
 
 ### A08 — Failles d'intégrité des données et du logiciel
 
@@ -160,11 +167,14 @@ applicable en l'état.
 - Un seul conteneur MySQL sans réplication ni failover : une panne du conteneur `db`
   (`docker-compose.yml`) interrompt le service entièrement. Proportionné au dimensionnement
   actuel (démonstrateur), mais à anticiper avant une mise en production réelle.
-- CI (`.github/workflows/ci.yml`, confirmé sur `origin/main` après fusion) : trois jobs —
-  `tests-backend` (54 tests PHPUnit, `needs` implicite car premier job), `build-frontend`
-  (compilation Vite), `build-images` (`needs: [tests-backend, build-frontend]`, build Docker
-  backend et frontend). Aucune publication d'image vers un registre ni déploiement automatisé —
-  la CI valide mais ne livre pas. **[RECOMMANDÉ]** si une mise en production continue est visée.
+- CI (`.github/workflows/ci.yml`, confirmé sur `origin/main`) : trois jobs déclenchés sur push et
+  PR vers `main`/`develop`. `tests-backend` (54 tests PHPUnit, avec un service MySQL 8.0 dédié) et
+  `build-frontend` (`npm run build`, Vite) n'ont pas de dépendance entre eux et s'exécutent en
+  parallèle. `build-images` déclare `needs: [tests-backend, build-frontend]` et ne démarre donc
+  que si les deux premiers réussissent ; il construit les deux images Docker (backend, frontend)
+  sans les publier vers un registre. La CI valide et construit, mais ne déploie pas.
+  **[RECOMMANDÉ]** publication vers un registre + déploiement automatisé si une mise en production
+  continue est visée.
 
 ---
 
@@ -176,16 +186,16 @@ croisement des deux, état constaté dans le dépôt à la date de rédaction.
 | # | Risque | Probabilité | Impact | Criticité | État | Mesure préventive | Mesure corrective |
 |---|---|---|---|---|---|---|---|
 | 1 | Absence de TLS (identifiants/JWT en clair sur le réseau) | Forte | Fort | **Élevée** | À FAIRE | Terminer TLS en amont (reverse proxy/LB), forcer redirection HTTP→HTTPS | Certificats (Let's Encrypt ou équivalent), renouvellement automatisé |
-| 2 | Vol de JWT par XSS (`localStorage`, `AuthContext.jsx`) | Moyenne | Fort | **Élevée** | Assumé (voir §7) | CSP stricte, échappement systématique (React le fait par défaut) | Révocation de session non disponible aujourd'hui — réduire le TTL, envisager migration cookie `HttpOnly` |
+| 2 | Vol de JWT par XSS (`localStorage`, `AuthContext.jsx`) | Moyenne | Fort | **Élevée** | Assumé (voir Q2) | CSP stricte (posée §1/A05), échappement systématique (React le fait par défaut) | Révocation de session non disponible aujourd'hui — réduire le TTL, envisager migration cookie `HttpOnly` |
 | 3 | Absence de sauvegarde de la base de données | Moyenne | Fort | **Élevée** | À FAIRE | Sauvegardes automatisées chiffrées, testées régulièrement | Procédure de restauration documentée et testée |
 | 4 | Secret JWT (passphrase) exposé dans l'historique git | Forte (avéré) | Moyen | Moyenne | Partiellement corrigé | Ne jamais committer de secret, `.gitignore` dès l'initialisation | Rotation de la passphrase + nettoyage d'historique (voir §5) |
 | 5 | Consentement RGPD non tracé côté serveur | Forte (avéré) | Moyen | Moyenne | À FAIRE | Champ de consentement horodaté sur `User` | Migration + persistance du consentement à l'inscription |
 | 6 | Compte non vérifié pleinement fonctionnel (`isVerified` non appliqué) | Forte (avéré) | Faible | Moyenne | À FAIRE | Vérifier l'email avant d'autoriser les actions sensibles | Ajout d'un contrôle d'accès conditionné à `isVerified` |
 | 7 | 40 avis de sécurité sur dépendances (`composer audit`) non contrôlés en CI | Forte (avéré) | Moyen | Moyenne | À FAIRE | `composer audit` / `npm audit` en CI, bloquant sur criticité haute | Mise à jour des paquets concernés |
 | 8 | Image Docker backend embarque des dépendances de dev (absence de `.dockerignore`) | Moyenne | Moyen | Moyenne | À FAIRE | `.dockerignore` excluant `vendor/`, `.env.local`, `var/` | Reconstruction de l'image après correction |
-| 9 | Pas de révocation/refresh JWT : token volé reste valide jusqu'à 1h | Moyenne | Moyen | Moyenne | Assumé (voir §7) | TTL court (déjà 3600 s) | Bundle de refresh token + liste de révocation si le risque devient inacceptable |
+| 9 | Pas de révocation/refresh JWT : token volé reste valide jusqu'à 1h | Moyenne | Moyen | Moyenne | Assumé (voir Q3) | TTL court (déjà 3600 s) | Bundle de refresh token + liste de révocation si le risque devient inacceptable |
 | 10 | Validation de mot de passe absente sur `updateMe`/création admin (hors `/api/register`) | Moyenne | Moyen | Moyenne | À FAIRE | Étendre la contrainte de robustesse à ces deux routes | Réutiliser la même validation que `register` |
-| 11 | CSP absente (XSS facilité si une faille d'injection HTML apparaît) | Faible | Moyen | Faible/Moyenne | À FAIRE | Définir une CSP testée contre `/api/docs` et le frontend React | Déploiement progressif (`Content-Security-Policy-Report-Only` d'abord) |
+| 11 | CSP absente (XSS facilité si une faille d'injection HTML apparaît) | Faible | Moyen | Faible/Moyenne | **Corrigé** | CSP posée et testée contre `/api/docs` et le frontend React (§1/A05) | — |
 | 12 | Absence de chiffrement au repos (base MySQL) | Faible | Fort | Moyenne | À FAIRE | Chiffrement disque au niveau infrastructure (LUKS, chiffrement natif du fournisseur cloud) | Migration vers un hébergement avec chiffrement natif |
 | 13 | Panne du conteneur MySQL unique (pas de réplication) | Faible | Fort | Moyenne | Proportionné à l'échelle actuelle | Surveillance de disponibilité | Réplication/managed database avant montée en charge |
 
@@ -365,7 +375,7 @@ l'ajout de nouveaux champs sensibles (diagnostic, émotions).
 |---|---|
 | Protection de branche avec checks CI obligatoires | Configuration GitHub (hors dépôt de code, confirmée par le contexte projet) |
 | CI bloquante à 3 jobs | `.github/workflows/ci.yml` (confirmé fusionné sur `origin/main`) : `tests-backend` (54 tests PHPUnit), `build-frontend` (`npm run build`), `build-images` (`needs: [tests-backend, build-frontend]`, build des deux images Docker) |
-| 54 tests automatisés | Rejoués à 4 reprises pendant cet audit, `OK (54 tests, 72 assertions)` à chaque fois après correction |
+| 54 tests automatisés | Rejoués après chaque modification pendant cet audit, `OK (54 tests, 72 assertions)` systématiquement |
 | Dependabot (alerts, security, version updates) | `.github/dependabot.yml` — composer, npm, docker (x2), github-actions |
 | Clés JWT hors dépôt, générées à l'exécution | `backend/.gitignore:23` (`/config/jwt/*.pem`), génération via `lexik:jwt:generate-keypair` (`.github/workflows/ci.yml`) |
 | Mots de passe hachés Argon2id | Section 3 |
@@ -377,30 +387,50 @@ l'ajout de nouveaux champs sensibles (diagnostic, émotions).
 `docker-compose.yml` (également suivi) contenait par ailleurs `APP_SECRET: "a_changer_avant_la_prod"`
 et des identifiants MySQL en clair.
 
-**Correction** : `backend/.env` a été retiré du suivi git sur la branche de travail (vérifié :
-absent de `origin/Projets:backend/.env`, alors qu'il reste présent sur `origin/main`, qui
-n'a pas encore reçu ce correctif — point à traiter séparément). La rotation effective de la
-passphrase n'est pas confirmée à la date de rédaction.
+**Correction** : `backend/.env` a été retiré du suivi git sur la branche de travail
+`feature-veille` (vérifié : absent de `git ls-files`, présent uniquement via
+`backend/.env.example`, nouvellement créé avec des valeurs neutres pour permettre à un autre
+poste de démarrer le projet sans jamais manipuler de secret réel). Il reste en revanche encore
+suivi sur `main` et `develop`, qui n'ont pas reçu ce correctif — traité comme action restante
+(§8), pas comme un problème résiduel sur la branche auditée.
+
+La rotation a été effectuée et vérifiée : nouveaux `JWT_PASSPHRASE` et `APP_SECRET` générés
+(`openssl rand -hex 32`), nouvelle paire de clés régénérée avec
+`lexik:jwt:generate-keypair --overwrite`, image backend reconstruite, puis authentification
+rejouée avec succès (`POST /api/login` renvoie un token signé avec la nouvelle clé). L'ancienne
+passphrase reste lisible dans l'historique git tant qu'aucun nettoyage n'est fait (voir plus bas),
+mais elle est désormais sans valeur : la clé privée qu'elle protégeait a été régénérée, donc
+connaître l'ancienne passphrase ne permet plus de déchiffrer la clé actuellement utilisée.
 
 **Leçon retenue, à assumer à l'oral** : le retrait d'un fichier du suivi git ne l'efface pas de
 l'historique. Tant qu'aucun nettoyage d'historique (`git filter-repo` ou équivalent, suivi d'un
 push forcé et de la purge du cache GitHub) n'est effectué, quiconque dispose d'un accès au dépôt
 peut retrouver l'ancienne valeur via `git log`/`git show` sur les commits antérieurs — exactement
-la méthode utilisée pour établir ce constat pendant l'audit. Le retrait est une mesure
-d'hygiène nécessaire mais non suffisante ; **seule la rotation du secret neutralise réellement
-l'exposition**. **[RECOMMANDÉ]** confirmer la rotation de la passphrase et évaluer si un
-nettoyage d'historique est justifié compte tenu de la sensibilité réelle (une passphrase seule,
-sans la clé privée associée — qui elle n'a jamais été committée — ne permet pas à elle seule de
-forger un JWT valide, ce qui limite l'impact réel malgré la mauvaise pratique).
+la méthode utilisée pour établir ce constat pendant l'audit. Le retrait seul est une mesure
+d'hygiène nécessaire mais non suffisante ; **c'est la rotation qui neutralise réellement
+l'exposition**, pas le retrait du fichier. **[RECOMMANDÉ]** nettoyage d'historique si la
+sensibilité résiduelle le justifie — impact déjà limité puisque la clé privée protégée par
+l'ancienne passphrase n'est elle-même plus utilisée.
 
 ### Corrections appliquées et vérifiées pendant cet audit
 
-Quatre corrections, chacune validée par relecture de diff avant application puis par une
-exécution complète des 54 tests PHPUnit après application :
+Quatre corrections. Les points 2 à 4 étaient déjà en place au moment de cette relecture (issues
+d'une itération précédente) ; ils ont été revérifiés ici par lecture de code, exécution complète
+des 54 tests PHPUnit, puis appels API manuels en direct sur le conteneur reconstruit (requêtes
+`OPTIONS` avec origine autorisée/refusée, inscriptions avec email invalide et mots de passe
+faibles, 6 inscriptions consécutives pour déclencher le seuil de 5/minute, 6 connexions avec mot
+de passe erroné pour observer le message de throttling). Le point 1 (CSP) a été complété et affiné
+pendant cette session : diff montré avant chaque application, 54 tests rejoués après chaque
+changement, puis vérification manuelle par reconstruction des images, `curl -I` et inspection du
+HTML de `/api/docs`.
 
-1. **En-têtes de sécurité HTTP** — `backend/Dockerfile` (activation `mod_headers`),
-   `backend/apache-vhost.conf`, `frontend/nginx.conf`. Vérifié par `curl -I` sur les deux
-   services.
+1. **En-têtes de sécurité HTTP** — `backend/apache-vhost.conf`, `frontend/nginx.conf` :
+   `X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy`, `Permissions-Policy`,
+   `Strict-Transport-Security` déjà en place ; `Content-Security-Policy` ajoutée pendant cette
+   session, avec une exception ciblée pour `/api/docs` (voir §1/A05 pour le détail technique).
+   Vérifié par `curl -I` sur les deux services après reconstruction des images, et par inspection
+   du HTML servi par `/api/docs` pour confirmer que l'UI Swagger reste fonctionnelle sous la
+   policy assouplie.
 2. **CORS piloté par variable d'environnement** — `backend/config/packages/nelmio_cors.yaml`
    utilise désormais `%env(CORS_ALLOW_ORIGIN)%` au lieu d'une origine figée dans le code.
    Vérifié par requêtes `OPTIONS` avec origine autorisée et non autorisée.
@@ -486,20 +516,18 @@ S ≈ demi-journée, M ≈ 1-2 jours, L ≈ plusieurs jours).
 
 | Priorité | Action | Effort | Réf. |
 |---|---|---|---|
-| 1 | Confirmer/effectuer la rotation de la passphrase JWT | XS | §5 |
-| 2 | Mettre en place la terminaison TLS (reverse proxy ou service managé) | M | §1/§3 |
-| 3 | Mettre en place des sauvegardes chiffrées de la base MySQL, avec test de restauration | M | §1/§3 |
-| 4 | Ajouter `composer audit` / `npm audit` en CI et traiter les 40 avis déjà identifiés | M | §5 |
-| 5 | Persister le consentement RGPD (champ horodaté sur `User`, transmis depuis le frontend) | S | §4 |
-| 6 | Étendre la validation de mot de passe à `updateMe` et à la création admin | XS | §5 |
-| 7 | Ajouter un `.dockerignore` backend et vérifier que l'image de prod ne contient plus les dépendances `dev` | XS | §1 |
-| 8 | Appliquer le correctif d'en-têtes/CORS/rate-limiting/validation sur `origin/main` (actuellement seulement sur la branche de travail) | S | §1/§5 |
-| 9 | Définir et tester une Content-Security-Policy pour le backend (`/api/docs`) et le frontend | M | §1 |
-| 10 | Décider et documenter le traitement de `isVerified` (blocage effectif ou choix assumé) | S | §1 |
-| 11 | Ajouter PHPStan en CI (niveau progressif) | M | §5 |
-| 12 | Rédiger le registre des traitements (document externe au code) | S | §4 |
-| 13 | Nettoyer l'historique git de l'ancienne valeur de `JWT_PASSPHRASE` si la sensibilité résiduelle le justifie | S | §5 |
-| 14 | Poser les prérequis (HDS, AIPD, consentement explicite, chiffrement colonne) avant tout développement des modules diagnostic/tracker d'émotions | L | §4 |
+| 1 | Mettre en place la terminaison TLS (reverse proxy ou service managé) | M | §1/§3 |
+| 2 | Mettre en place des sauvegardes chiffrées de la base MySQL, avec test de restauration | M | §1/§3 |
+| 3 | Ajouter `composer audit` / `npm audit` en CI et traiter les 40 avis déjà identifiés | M | §5 |
+| 4 | Persister le consentement RGPD (champ horodaté sur `User`, transmis depuis le frontend) | S | §4 |
+| 5 | Étendre la validation de mot de passe à `updateMe` et à la création admin | XS | §5 |
+| 6 | Ajouter un `.dockerignore` backend et vérifier que l'image de prod ne contient plus les dépendances `dev` | XS | §1 |
+| 7 | Appliquer sur `origin/main` et `develop` les correctifs déjà en place sur `feature-veille` (en-têtes/CSP/CORS/rate-limiting/validation, retrait de `backend/.env` du suivi git) | S | §1/§5 |
+| 8 | Décider et documenter le traitement de `isVerified` (blocage effectif ou choix assumé) | S | §1 |
+| 9 | Ajouter PHPStan en CI (niveau progressif) | M | §5 |
+| 10 | Rédiger le registre des traitements (document externe au code) | S | §4 |
+| 11 | Nettoyer l'historique git de l'ancienne valeur de `JWT_PASSPHRASE` si la sensibilité résiduelle le justifie | S | §5 |
+| 12 | Poser les prérequis (HDS, AIPD, consentement explicite, chiffrement colonne) avant tout développement des modules diagnostic/tracker d'émotions | L | §4 |
 
 ---
 
@@ -545,22 +573,28 @@ pas être pris au dépourvu si la question m'est posée à l'oral sur ce point p
 
 **Q5. Vous avez trouvé un secret committé dans le dépôt — comment avez-vous vérifié que le
 problème est réglé ?**
-J'ai vérifié directement sur le remote (`git cat-file -e origin/Projets:backend/.env`) que le
-fichier est absent de la branche de travail actuelle, alors qu'il est toujours présent sur
-`origin/main` qui n'a pas reçu ce correctif — je le signale comme action restante. Sur la
-rotation de la passphrase elle-même, je n'ai pas pu confirmer qu'elle a été faite, donc je ne la
-présente pas comme acquise dans le document. J'insiste sur le point que le retrait du fichier ne
-suffit pas : la valeur reste consultable dans l'historique git tant qu'aucun nettoyage
-d'historique n'est effectué, ce qui limite la portée réelle de la seule suppression.
+`backend/.env` est retiré du suivi git sur `feature-veille` (vérifié : absent de `git ls-files`),
+et j'ai effectué la rotation elle-même plutôt que de me contenter du retrait : nouvelle
+passphrase et nouvel `APP_SECRET` générés (`openssl rand -hex 32`), nouvelle paire de clés RSA
+régénérée (`lexik:jwt:generate-keypair --overwrite`), image backend reconstruite, puis
+authentification rejouée avec succès pour confirmer que le nouveau couple clé/passphrase
+fonctionne de bout en bout. Ce que je ne présente pas comme réglé : le fichier reste suivi sur
+`main` et `develop` (action restante, §8), et l'ancienne valeur reste lisible dans l'historique
+git tant qu'aucun nettoyage n'est fait — mais elle a perdu toute valeur puisque la clé privée
+qu'elle protégeait n'est plus celle utilisée en production.
 
-**Q6. Pourquoi ne pas avoir mis en place de Content-Security-Policy alors que c'est une
-recommandation OWASP standard ?**
-Je l'ai volontairement exclue du lot de corrections appliquées pendant cet audit parce que
-`/api/docs` sert une documentation API Platform potentiellement rendue en HTML par le navigateur,
-et une CSP mal calibrée peut la casser silencieusement. Plutôt que de deviner une règle et
-risquer une régression non détectée par les 54 tests PHPUnit (qui ne couvrent pas le rendu
-navigateur), j'ai préféré la signaler comme action recommandée nécessitant un test navigateur
-dédié plutôt que l'appliquer à l'aveugle.
+**Q6. Comment avez-vous géré la Content-Security-Policy sachant que `/api/docs` sert une page
+HTML (Swagger) alors que le reste de l'API ne renvoie que du JSON ?**
+Une première version avec `default-src 'none'` partout cassait effectivement l'UI Swagger — je
+l'ai constaté en inspectant le HTML servi par `/api/docs` (feuilles de style externes sous
+`/assets`, bloc `<script>` inline pour le bootstrap). Plutôt que d'assouplir la policy pour
+toute l'API, j'ai isolé une exception à cette seule route : `default-src 'self'` avec
+`'unsafe-inline'` sur `script-src` uniquement là, et `'none'` partout ailleurs. Techniquement, un
+premier essai avec `<LocationMatch>`/`<If>` n'a pas produit la priorité attendue sur cette version
+d'Apache (la directive la plus large l'emportait sur la plus spécifique, contre-intuitivement) ;
+j'ai basculé sur `SetEnvIf Request_URI` combiné à `Header ... env=`, un mécanisme plus ancien mais
+dont le comportement est déterministe, et vérifié par `curl -I` sur les deux routes après
+reconstruction de l'image.
 
 **Q7. La limitation de débit sur `/api/login` renvoie 401 au lieu de 429 — n'est-ce pas un bug
 que vous auriez dû corriger ?**
@@ -574,9 +608,12 @@ des corrections validées pour cet audit — un arbitrage de gestion de projet, 
 technique.
 
 **Q8. Comment avez-vous vérifié que vos quatre corrections n'ont rien cassé ?**
-À chaque correction, j'ai montré le diff avant application, reconstruit les images Docker
-concernées, puis rejoué l'intégralité des 54 tests PHPUnit (`OK (54 tests, 72 assertions)` à
-chaque fois), et ajouté une vérification manuelle ciblée sur le comportement changé : en-têtes
-présents via `curl -I`, origine CORS acceptée/refusée selon l'origine testée, validation
-acceptant/rejetant les cas limites de mot de passe et d'email, et dépassement de seuil déclenchant
-bien un blocage sur `/api/login` et `/api/register`.
+Pour la CSP (seule correction réellement appliquée pendant cette relecture), diff montré avant
+application, image reconstruite, 54 tests PHPUnit rejoués (`OK (54 tests, 72 assertions)`), puis
+vérification manuelle ciblée : en-têtes présents via `curl -I` sur les deux services, et HTML de
+`/api/docs` inspecté pour confirmer que la policy assouplie ne casse pas l'UI Swagger. Pour les
+trois autres, déjà en place avant cette session : mêmes 54 tests rejoués sans régression, puis
+vérification manuelle en direct sur le conteneur reconstruit — origine CORS acceptée/refusée
+selon l'origine testée, validation acceptant/rejetant les cas limites de mot de passe et d'email,
+et dépassement de seuil déclenchant bien un blocage sur `/api/login` (401 avec message de
+throttling) et `/api/register` (429 à la 6ᵉ tentative cumulée).
