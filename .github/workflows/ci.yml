@@ -71,6 +71,10 @@ jobs:
           APP_SECRET: ci_secret_non_sensible
           DATABASE_URL: "mysql://root:root@127.0.0.1:3306/cesizen_test?serverVersion=8.0&charset=utf8mb4"
 
+      - name: Audit de sécurité des dépendances
+        working-directory: backend
+        run: composer audit --no-dev
+
   build-frontend:
     name: Build frontend (React/Vite)
     runs-on: ubuntu-latest

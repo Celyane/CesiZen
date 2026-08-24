@@ -2,7 +2,7 @@
 
 Document produit dans le cadre du bloc 3 « Déployer et sécuriser les applications informatiques »
 (titre Concepteur Développeur d'Applications). Il s'appuie sur une analyse du code du dépôt à la
-date de rédaction, complétée par un audit ciblé ayant donné lieu à quatre corrections appliquées
+date de rédaction, complétée par un audit ciblé ayant donné lieu à cinq corrections appliquées
 et vérifiées (54 tests PHPUnit rejoués après chacune).
 
 **Convention utilisée dans tout le document** : chaque affirmation sur l'existant cite le fichier
@@ -108,13 +108,14 @@ ce qui exclut l'injection SQL classique sur ce vecteur.
   dans le code — permet de configurer une vraie origine de production sans modification de code.
 - Interfaces de debug (`web_profiler`, `_wdt`, MakerBundle) déclarées uniquement pour `dev` dans
   `backend/config/bundles.php` — absentes de l'image construite en environnement `prod`.
+- `.dockerignore` backend (`backend/.dockerignore`) exclut `.git`, `.env`/`.env.*.local`,
+  `vendor`, `var`, `config/jwt` et `tests` du contexte de build. Un fichier `backend/dockerignore`
+  existait déjà mais sans le point initial, donc invisible pour Docker (`COPY . .` dans
+  `backend/Dockerfile` continuait à copier le `vendor/` du poste de développement — dépendances
+  `dev` comprises, dont PHPUnit — par-dessus l'installation `--no-dev` faite à l'étape précédente,
+  annulant son effet) : renommé en `.dockerignore` pour être effectivement pris en compte.
 
-**Reste exposé** :
-- L'image Docker backend ne dispose d'aucun `.dockerignore` : `COPY . .` dans
-  `backend/Dockerfile` copie le `vendor/` du poste de développement (avec dépendances `dev`,
-  dont PHPUnit) par-dessus l'installation `--no-dev` faite à l'étape précédente, ce qui annule
-  l'effet de `--no-dev` et alourdit l'image de production avec des outils qui n'ont rien à y
-  faire. **[RECOMMANDÉ]**
+**Reste exposé** : néant identifié sur ce point après correction.
 
 ### A06 — Composants vulnérables ou obsolètes
 
@@ -122,11 +123,21 @@ ce qui exclut l'injection SQL classique sur ce vecteur.
 frontend, images Docker backend/frontend, GitHub Actions) avec des fréquences hebdomadaires à
 mensuelles.
 
-**Reste exposé** : `composer audit` (exécuté pendant cet audit, lors de l'ajout de
-`symfony/rate-limiter`) a remonté **40 avis de sécurité sur 15 paquets**. Cette commande n'est
-pas exécutée en CI (`.github/workflows/ci.yml` ne contient aucune étape d'audit), donc rien ne
-bloque une PR qui introduirait ou laisserait passer une dépendance vulnérable en dehors du
-rythme hebdomadaire de Dependabot. **[RECOMMANDÉ]**
+**Couvert (corrigé pendant cet audit)** : `composer audit` a initialement remonté **40 avis de
+sécurité sur 15 paquets** (dont 1 critique — `twig/twig` — et 10 élevés, notamment sur
+`symfony/security-http`, `symfony/mime`, `symfony/http-kernel`). Les correctifs étaient déjà
+couverts par les bornes de version existantes dans `composer.json` (`8.0.*`, `^2.12|^3.0`,
+`^4.29`) : `composer update` ciblé sur les paquets concernés a suffi, sans élargir aucune
+contrainte majeure. Vérifié par `composer audit` (0 avis restant, y compris en conteneur avec
+`--no-dev`), 54 tests PHPUnit rejoués, puis reconstruction de l'image Docker `backend` et nouvel
+appel `composer audit` à l'intérieur du conteneur pour confirmer que l'image publiée est saine.
+
+**Couvert (corrigé pendant cet audit)** : `composer audit --no-dev` ajouté en étape bloquante du
+job `tests-backend` de `.github/workflows/ci.yml` — toute PR introduisant une dépendance
+vulnérable côté backend fait désormais échouer la CI, plus seulement le rythme hebdomadaire de
+Dependabot.
+
+**Reste exposé** : équivalent `npm audit` toujours absent côté frontend. **[RECOMMANDÉ]**
 
 ### A07 — Identification et authentification défaillantes
 
@@ -188,11 +199,11 @@ croisement des deux, état constaté dans le dépôt à la date de rédaction.
 | 1 | Absence de TLS (identifiants/JWT en clair sur le réseau) | Forte | Fort | **Élevée** | À FAIRE | Terminer TLS en amont (reverse proxy/LB), forcer redirection HTTP→HTTPS | Certificats (Let's Encrypt ou équivalent), renouvellement automatisé |
 | 2 | Vol de JWT par XSS (`localStorage`, `AuthContext.jsx`) | Moyenne | Fort | **Élevée** | Assumé (voir Q2) | CSP stricte (posée §1/A05), échappement systématique (React le fait par défaut) | Révocation de session non disponible aujourd'hui — réduire le TTL, envisager migration cookie `HttpOnly` |
 | 3 | Absence de sauvegarde de la base de données | Moyenne | Fort | **Élevée** | À FAIRE | Sauvegardes automatisées chiffrées, testées régulièrement | Procédure de restauration documentée et testée |
-| 4 | Secret JWT (passphrase) exposé dans l'historique git | Forte (avéré) | Moyen | Moyenne | Partiellement corrigé | Ne jamais committer de secret, `.gitignore` dès l'initialisation | Rotation de la passphrase + nettoyage d'historique (voir §5) |
+| 4 | Secret JWT (passphrase) exposé dans l'historique Git | Forte (avéré) | Moyen | Moyenne | **Corrigé** | Ne jamais versionner de secret ; `.gitignore` dès l'initialisation du projet | Rotation effectuée : nouvelle passphrase, paire de clés régénérée, tokens antérieurs invalidés. Résiduel : l'ancienne valeur subsiste dans l'historique, sans impact puisqu'elle n'est plus en usage. Nettoyage d'historique jugé non nécessaire (dépôt privé). |
 | 5 | Consentement RGPD non tracé côté serveur | Forte (avéré) | Moyen | Moyenne | À FAIRE | Champ de consentement horodaté sur `User` | Migration + persistance du consentement à l'inscription |
 | 6 | Compte non vérifié pleinement fonctionnel (`isVerified` non appliqué) | Forte (avéré) | Faible | Moyenne | À FAIRE | Vérifier l'email avant d'autoriser les actions sensibles | Ajout d'un contrôle d'accès conditionné à `isVerified` |
-| 7 | 40 avis de sécurité sur dépendances (`composer audit`) non contrôlés en CI | Forte (avéré) | Moyen | Moyenne | À FAIRE | `composer audit` / `npm audit` en CI, bloquant sur criticité haute | Mise à jour des paquets concernés |
-| 8 | Image Docker backend embarque des dépendances de dev (absence de `.dockerignore`) | Moyenne | Moyen | Moyenne | À FAIRE | `.dockerignore` excluant `vendor/`, `.env.local`, `var/` | Reconstruction de l'image après correction |
+| 7 | Nouvelles vulnérabilités dépendances non détectées entre deux cycles Dependabot (pas de `composer audit`/`npm audit` en CI) | Moyenne | Moyen | Moyenne | Stock initial corrigé (0 avis), CI à faire | `composer audit` / `npm audit` en CI, bloquant sur criticité haute | 40 avis initiaux (1 critique, 10 élevés) résolus par mise à jour ciblée des paquets concernés — reste à automatiser le contrôle en continu |
+| 8 | Image Docker backend embarque des dépendances de dev (`.dockerignore` mal nommé, sans effet) | Moyenne | Moyen | Moyenne | **Corrigé** | `.dockerignore` excluant `vendor/`, `.env`/`.env.*.local`, `var/`, `config/jwt`, `tests` | Fichier renommé `dockerignore` → `.dockerignore` ; image reconstruite pour vérification |
 | 9 | Pas de révocation/refresh JWT : token volé reste valide jusqu'à 1h | Moyenne | Moyen | Moyenne | Assumé (voir Q3) | TTL court (déjà 3600 s) | Bundle de refresh token + liste de révocation si le risque devient inacceptable |
 | 10 | Validation de mot de passe absente sur `updateMe`/création admin (hors `/api/register`) | Moyenne | Moyen | Moyenne | À FAIRE | Étendre la contrainte de robustesse à ces deux routes | Réutiliser la même validation que `register` |
 | 11 | CSP absente (XSS facilité si une faille d'injection HTML apparaît) | Faible | Moyen | Faible/Moyenne | **Corrigé** | CSP posée et testée contre `/api/docs` et le frontend React (§1/A05) | — |
@@ -390,9 +401,14 @@ et des identifiants MySQL en clair.
 **Correction** : `backend/.env` a été retiré du suivi git sur la branche de travail
 `feature-veille` (vérifié : absent de `git ls-files`, présent uniquement via
 `backend/.env.example`, nouvellement créé avec des valeurs neutres pour permettre à un autre
-poste de démarrer le projet sans jamais manipuler de secret réel). Il reste en revanche encore
-suivi sur `main` et `develop`, qui n'ont pas reçu ce correctif — traité comme action restante
-(§8), pas comme un problème résiduel sur la branche auditée.
+poste de démarrer le projet sans jamais manipuler de secret réel). Ces commits ayant été poussés
+sur `feature-veille` **après** la fusion de cette branche dans `main` (PR déjà mergée au moment
+où les corrections ont été committées), ils n'ont jamais atteint `main`/`develop` malgré le push
+— un cherry-pick a donc été nécessaire sur une nouvelle branche, `feature-security`, pour les
+rapatrier en vue d'une PR vers `main` (voir correction n°5 ci-dessous pour l'incident rencontré
+pendant cette opération). Au moment de la rédaction, le correctif est vérifié sur
+`feature-veille` et `feature-security`, mais `main` et `develop` ne l'ont pas encore reçu —
+traité comme action restante (§8), pas comme un problème résiduel sur les branches auditées.
 
 La rotation a été effectuée et vérifiée : nouveaux `JWT_PASSPHRASE` et `APP_SECRET` générés
 (`openssl rand -hex 32`), nouvelle paire de clés régénérée avec
@@ -414,7 +430,7 @@ l'ancienne passphrase n'est elle-même plus utilisée.
 
 ### Corrections appliquées et vérifiées pendant cet audit
 
-Quatre corrections. Les points 2 à 4 étaient déjà en place au moment de cette relecture (issues
+Cinq corrections. Les points 2 à 4 étaient déjà en place au moment de cette relecture (issues
 d'une itération précédente) ; ils ont été revérifiés ici par lecture de code, exécution complète
 des 54 tests PHPUnit, puis appels API manuels en direct sur le conteneur reconstruit (requêtes
 `OPTIONS` avec origine autorisée/refusée, inscriptions avec email invalide et mots de passe
@@ -453,16 +469,34 @@ HTML de `/api/docs`.
    d'authentification en 401 sans distinguer l'exception de throttling. Protection
    fonctionnellement effective ; imprécision de code HTTP assumée et documentée plutôt que
    corrigée dans le cadre de cet audit.
+5. **Mise à jour des dépendances vulnérables (`composer audit`)** — 40 avis initiaux (1 critique,
+   10 élevés), tous résolus par `composer update` ciblé sur les paquets concernés
+   (`twig/twig` → 3.28, plusieurs paquets `symfony/*` → dernier patch `8.0.x`,
+   `easycorp/easyadmin-bundle` → 4.29.16), sans élargir aucune contrainte majeure de
+   `composer.json`. Vérifié par `composer audit` (0 avis, y compris en conteneur `--no-dev`), 54
+   tests PHPUnit rejoués, puis reconstruction et revérification de l'image Docker `backend`.
+   **Incident rencontré et corrigé pendant cette même session** : en récupérant par cherry-pick,
+   sur une nouvelle branche (`feature-security`), des commits de sécurité restés uniquement sur
+   `feature-veille` après la fusion de cette dernière (voir remarque plus bas sur ce
+   désynchronisation), la résolution manuelle d'un conflit avait supprimé par erreur la ligne
+   `symfony/rate-limiter` de `backend/composer.json` — perdant silencieusement la dépendance
+   explicite posée par la correction n°4 ci-dessus. Repéré en comparant le commit cherry-pické à
+   son commit source (`git diff --cached <commit-source>`), corrigé en restaurant la ligne et en
+   régénérant le hash de `composer.lock` (`composer update --lock`, sans changement de version),
+   puis revérifié par `composer audit` et les 54 tests. **Leçon retenue** : une résolution de
+   conflit "tous les conflits sont résolus" par Git ne garantit pas l'absence d'erreur humaine —
+   seule la comparaison explicite avec le commit source et le rejeu des tests l'ont détectée.
 
 ### Compléments recommandés
 
 - `PHPStan` : absent (`phpstan/phpdoc-parser` présent dans `composer.json` n'est qu'une
   dépendance indirecte d'un autre paquet, pas l'outil d'analyse statique lui-même).
   **[RECOMMANDÉ]** ajout en CI, niveau progressif.
-- `composer audit` / `npm audit` : absents de `.github/workflows/ci.yml`. **[RECOMMANDÉ]**
-  étape dédiée, au minimum non bloquante dans un premier temps compte tenu des 40 avis déjà
-  identifiés, puis bloquante une fois le stock traité.
-- `.dockerignore` côté backend : absent, voir section 1/A05.
+- `composer audit --no-dev` : ajouté en étape bloquante de `.github/workflows/ci.yml`
+  (job `tests-backend`) — toute PR introduisant une dépendance vulnérable fait désormais échouer
+  la CI, plus seulement le rythme hebdomadaire de Dependabot. Il reste à ajouter l'équivalent
+  `npm audit` côté frontend. **[RECOMMANDÉ]**
+- `.dockerignore` côté backend : corrigé, voir section 1/A05.
 - Étendre la validation de mot de passe à `updateMe` et à la création par un administrateur
   (point 3 ci-dessus).
 
@@ -518,11 +552,11 @@ S ≈ demi-journée, M ≈ 1-2 jours, L ≈ plusieurs jours).
 |---|---|---|---|
 | 1 | Mettre en place la terminaison TLS (reverse proxy ou service managé) | M | §1/§3 |
 | 2 | Mettre en place des sauvegardes chiffrées de la base MySQL, avec test de restauration | M | §1/§3 |
-| 3 | Ajouter `composer audit` / `npm audit` en CI et traiter les 40 avis déjà identifiés | M | §5 |
+| 3 | ~~Ajouter `composer audit` en CI, bloquant~~ **Fait** — reste `npm audit` côté frontend | XS | §5 |
 | 4 | Persister le consentement RGPD (champ horodaté sur `User`, transmis depuis le frontend) | S | §4 |
 | 5 | Étendre la validation de mot de passe à `updateMe` et à la création admin | XS | §5 |
-| 6 | Ajouter un `.dockerignore` backend et vérifier que l'image de prod ne contient plus les dépendances `dev` | XS | §1 |
-| 7 | Appliquer sur `origin/main` et `develop` les correctifs déjà en place sur `feature-veille` (en-têtes/CSP/CORS/rate-limiting/validation, retrait de `backend/.env` du suivi git) | S | §1/§5 |
+| 6 | ~~Ajouter un `.dockerignore` backend~~ **Fait** | — | §1 |
+| 7 | Merger `feature-security` vers `main`/`develop` (cherry-pick déjà effectué et revérifié : en-têtes/CSP/CORS/rate-limiting/validation/dépendances, retrait de `backend/.env` du suivi git) | S | §1/§5 |
 | 8 | Décider et documenter le traitement de `isVerified` (blocage effectif ou choix assumé) | S | §1 |
 | 9 | Ajouter PHPStan en CI (niveau progressif) | M | §5 |
 | 10 | Rédiger le registre des traitements (document externe au code) | S | §4 |
@@ -607,13 +641,17 @@ mais il a été décidé de documenter ce point comme limite connue plutôt que 
 des corrections validées pour cet audit — un arbitrage de gestion de projet, pas un oubli
 technique.
 
-**Q8. Comment avez-vous vérifié que vos quatre corrections n'ont rien cassé ?**
+**Q8. Comment avez-vous vérifié que vos cinq corrections n'ont rien cassé ?**
 Pour la CSP (seule correction réellement appliquée pendant cette relecture), diff montré avant
 application, image reconstruite, 54 tests PHPUnit rejoués (`OK (54 tests, 72 assertions)`), puis
 vérification manuelle ciblée : en-têtes présents via `curl -I` sur les deux services, et HTML de
 `/api/docs` inspecté pour confirmer que la policy assouplie ne casse pas l'UI Swagger. Pour les
-trois autres, déjà en place avant cette session : mêmes 54 tests rejoués sans régression, puis
-vérification manuelle en direct sur le conteneur reconstruit — origine CORS acceptée/refusée
-selon l'origine testée, validation acceptant/rejetant les cas limites de mot de passe et d'email,
-et dépassement de seuil déclenchant bien un blocage sur `/api/login` (401 avec message de
-throttling) et `/api/register` (429 à la 6ᵉ tentative cumulée).
+trois autres correctifs déjà en place avant cette session : mêmes 54 tests rejoués sans
+régression, puis vérification manuelle en direct sur le conteneur reconstruit — origine CORS
+acceptée/refusée selon l'origine testée, validation acceptant/rejetant les cas limites de mot de
+passe et d'email, et dépassement de seuil déclenchant bien un blocage sur `/api/login` (401 avec
+message de throttling) et `/api/register` (429 à la 6ᵉ tentative cumulée). Pour la mise à jour des
+dépendances (`composer audit`) : `composer audit` revérifié à 0 avis avant et après reconstruction
+de l'image Docker en conditions `--no-dev`, 54 tests rejoués, et l'incident de cherry-pick
+(ligne `symfony/rate-limiter` perdue puis restaurée) détecté par comparaison explicite avec le
+commit source plutôt que par simple confiance dans la résolution automatique de Git.
