@@ -38,7 +38,7 @@ jobs:
           coverage: none
 
       - name: Cache des dépendances Composer
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: backend/vendor
           key: composer-${{ hashFiles('backend/composer.lock') }}
@@ -105,7 +105,7 @@ jobs:
           coverage: none
 
       - name: Cache des dépendances Composer
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: backend/vendor
           key: composer-${{ hashFiles('backend/composer.lock') }}
