@@ -75,6 +75,38 @@ jobs:
         working-directory: backend
         run: composer audit --no-dev
 
+  code-quality:
+    name: Qualité de code backend (phpqa)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Récupération du code
+        uses: actions/checkout@v4
+
+      # jakzal/phpqa embarque PHPStan, PHP-CS-Fixer, PHPMD et PHPCPD dans une
+      # seule image : pas de composer require dev supplémentaire, un seul
+      # binaire à faire évoluer. Chaque outil est bloquant : un écart sur le
+      # code déjà en place ferait échouer ce job (voir backend/phpstan.neon,
+      # .php-cs-fixer.php, phpmd.xml pour les seuils retenus et leur raison).
+      - name: PHPStan (analyse statique, niveau 3)
+        run: |
+          docker run --rm -v "${{ github.workspace }}/backend:/project" -w /project \
+            jakzal/phpqa:php8.4 phpstan analyse --configuration=phpstan.neon --no-progress
+
+      - name: PHP-CS-Fixer (style PSR-12)
+        run: |
+          docker run --rm -v "${{ github.workspace }}/backend:/project" -w /project \
+            jakzal/phpqa:php8.4 php-cs-fixer fix --config=.php-cs-fixer.php --dry-run --diff
+
+      - name: PHPMD (complexité, code mort)
+        run: |
+          docker run --rm -v "${{ github.workspace }}/backend:/project" -w /project \
+            jakzal/phpqa:php8.4 phpmd src text phpmd.xml
+
+      - name: PHPCPD (code dupliqué)
+        run: |
+          docker run --rm -v "${{ github.workspace }}/backend:/project" -w /project \
+            jakzal/phpqa:php8.4 phpcpd src
+
   build-frontend:
     name: Build frontend (React/Vite)
     runs-on: ubuntu-latest
@@ -99,7 +131,7 @@ jobs:
   build-images:
     name: Build des images Docker
     runs-on: ubuntu-latest
-    needs: [ tests-backend, build-frontend ]
+    needs: [ tests-backend, code-quality, build-frontend ]
     steps:
       - uses: actions/checkout@v4
 

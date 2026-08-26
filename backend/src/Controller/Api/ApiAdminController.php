@@ -25,7 +25,7 @@ class ApiAdminController extends AbstractController
         BreathingExerciceRepository $exerciceRepo
     ): JsonResponse {
         $allResources = $resourceRepo->findAll();
-        $visible = array_filter($allResources, fn($r) => $r->isVisible());
+        $visible = array_filter($allResources, fn ($r) => $r->isVisible());
 
         return $this->json([
             'usersCount' => count($userRepo->findAll()),
@@ -40,7 +40,7 @@ class ApiAdminController extends AbstractController
     {
         $resources = $repo->findBy([], ['createdAt' => 'DESC']);
 
-        return $this->json(array_map(fn($r) => [
+        return $this->json(array_map(fn ($r) => [
             'id' => $r->getId(),
             'title' => $r->getTitle(),
             'type' => $r->getType(),
@@ -70,7 +70,7 @@ class ApiAdminController extends AbstractController
     {
         $exercices = $repo->findBy([], ['createdAt' => 'DESC']);
 
-        return $this->json(array_map(fn($e) => [
+        return $this->json(array_map(fn ($e) => [
             'id' => $e->getId(),
             'name' => $e->getName(),
             'type' => $e->getType(),

@@ -21,5 +21,12 @@ class UserChecker implements UserCheckerInterface
         }
     }
 
-    public function checkPostAuth(UserInterface $user, ?TokenInterface $token = null): void {}
+    /**
+     * Required by UserCheckerInterface; nothing to check post-auth.
+     *
+     * @SuppressWarnings("PHPMD.UnusedFormalParameter")
+     */
+    public function checkPostAuth(UserInterface $user, ?TokenInterface $token = null): void
+    {
+    }
 }

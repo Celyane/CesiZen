@@ -157,19 +157,19 @@ class AuthController extends AbstractController
         /** @var User $user */
         $user = $this->getUser();
 
-        $favorites = array_map(fn($r) => [
+        $favorites = array_map(fn ($r) => [
             'id' => $r->getId(),
             'title' => $r->getTitle(),
             'type' => $r->getType(),
         ], $user->getFavoriteResources()->toArray());
 
-        $read = array_map(fn($r) => [
+        $read = array_map(fn ($r) => [
             'id' => $r->getId(),
             'title' => $r->getTitle(),
             'type' => $r->getType(),
         ], $user->getReadResources()->toArray());
 
-        $exercises = array_map(fn($e) => [
+        $exercises = array_map(fn ($e) => [
             'id' => $e->getId(),
             'name' => $e->getName(),
             'type' => $e->getType(),
