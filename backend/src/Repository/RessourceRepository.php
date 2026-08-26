@@ -15,19 +15,4 @@ class RessourceRepository extends ServiceEntityRepository
     {
         parent::__construct($registry, Resource::class);
     }
-    public function findAllOrderedByName(): array
-    {
-        return $this->createQueryBuilder('r')
-            ->orderBy('r.name', 'ASC')
-            ->getQuery()
-            ->getResult();
-    }
-    public function findOneById(int $id): ?Resource
-    {
-        return $this->createQueryBuilder('r')
-            ->andWhere('r.id = :id')
-            ->setParameter('id', $id)
-            ->getQuery()
-            ->getOneOrNullResult();
-    }
 }

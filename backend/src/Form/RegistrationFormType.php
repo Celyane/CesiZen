@@ -14,6 +14,11 @@ use Symfony\Component\Validator\Constraints\NotBlank;
 
 class RegistrationFormType extends AbstractType
 {
+    /**
+     * $options is required by FormTypeInterface, unused here.
+     *
+     * @SuppressWarnings("PHPMD.UnusedFormalParameter")
+     */
     public function buildForm(FormBuilderInterface $builder, array $options): void
     {
         $builder

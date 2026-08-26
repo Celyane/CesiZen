@@ -48,7 +48,7 @@ class ApiResourceController extends AbstractController
         /** @var User|null $user */
         $user = $this->getUser();
 
-        return $this->json(array_map(fn($r) => $this->serialize($r, $user), $resources));
+        return $this->json(array_map(fn ($r) => $this->serialize($r, $user), $resources));
     }
 
     #[Route('/{id}', name: 'api_resource_show', methods: ['GET'])]
@@ -106,11 +106,21 @@ class ApiResourceController extends AbstractController
 
         $data = json_decode($request->getContent(), true);
 
-        if (isset($data['title'])) $resource->setTitle($data['title']);
-        if (isset($data['text'])) $resource->setText($data['text']);
-        if (isset($data['type'])) $resource->setType($data['type']);
-        if (array_key_exists('image', $data)) $resource->setImage($data['image']);
-        if (isset($data['visible'])) $resource->setVisible($data['visible']);
+        if (isset($data['title'])) {
+            $resource->setTitle($data['title']);
+        }
+        if (isset($data['text'])) {
+            $resource->setText($data['text']);
+        }
+        if (isset($data['type'])) {
+            $resource->setType($data['type']);
+        }
+        if (array_key_exists('image', $data)) {
+            $resource->setImage($data['image']);
+        }
+        if (isset($data['visible'])) {
+            $resource->setVisible($data['visible']);
+        }
 
         $em->flush();
 
@@ -158,14 +168,14 @@ class ApiResourceController extends AbstractController
 
         if ($user->getFavoriteResources()->contains($resource)) {
             $user->removeFavoriteResource($resource);
-            $isFavorite = false;
-        } else {
-            $user->addFavoriteResource($resource);
-            $isFavorite = true;
+            $em->flush();
+
+            return $this->json(['isFavorite' => false]);
         }
 
+        $user->addFavoriteResource($resource);
         $em->flush();
 
-        return $this->json(['isFavorite' => $isFavorite]);
+        return $this->json(['isFavorite' => true]);
     }
 }

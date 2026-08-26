@@ -113,7 +113,7 @@ export default function Register() {
                 onChange={(e) => setRgpdConsent(e.target.checked)}
                 required
               />
-              J'accepte que mes données personnelles soient traitées conformément à la politique de confidentialité.
+              J’accepte que mes données personnelles soient traitées conformément à la politique de confidentialité.
             </label>
           </div>
           <button type="submit" className="btn btn-primary btn-full" disabled={loading || !rgpdConsent}>

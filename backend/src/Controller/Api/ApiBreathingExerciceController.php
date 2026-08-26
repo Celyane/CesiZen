@@ -45,7 +45,7 @@ class ApiBreathingExerciceController extends AbstractController
         $user = $this->getUser();
         $exercices = $repo->findAll();
 
-        return $this->json(array_map(fn($e) => $this->serialize($e, $user), $exercices));
+        return $this->json(array_map(fn ($e) => $this->serialize($e, $user), $exercices));
     }
 
     #[Route('/{id}', name: 'api_breathing_show', methods: ['GET'])]
@@ -91,14 +91,30 @@ class ApiBreathingExerciceController extends AbstractController
     {
         $data = json_decode($request->getContent(), true);
 
-        if (isset($data['name'])) $exercice->setName($data['name']);
-        if (isset($data['duration'])) $exercice->setDuration((int) $data['duration']);
-        if (isset($data['description'])) $exercice->setDescription($data['description']);
-        if (isset($data['type'])) $exercice->setType($data['type']);
-        if (isset($data['timeInhale'])) $exercice->setTimeInhale((int) $data['timeInhale']);
-        if (array_key_exists('timeHold', $data)) $exercice->setTimeHold($data['timeHold'] !== null ? (int) $data['timeHold'] : null);
-        if (isset($data['timeExhale'])) $exercice->setTimeExhale((int) $data['timeExhale']);
-        if (isset($data['numberCycle'])) $exercice->setNumberCycle((int) $data['numberCycle']);
+        if (isset($data['name'])) {
+            $exercice->setName($data['name']);
+        }
+        if (isset($data['duration'])) {
+            $exercice->setDuration((int) $data['duration']);
+        }
+        if (isset($data['description'])) {
+            $exercice->setDescription($data['description']);
+        }
+        if (isset($data['type'])) {
+            $exercice->setType($data['type']);
+        }
+        if (isset($data['timeInhale'])) {
+            $exercice->setTimeInhale((int) $data['timeInhale']);
+        }
+        if (array_key_exists('timeHold', $data)) {
+            $exercice->setTimeHold($data['timeHold'] !== null ? (int) $data['timeHold'] : null);
+        }
+        if (isset($data['timeExhale'])) {
+            $exercice->setTimeExhale((int) $data['timeExhale']);
+        }
+        if (isset($data['numberCycle'])) {
+            $exercice->setNumberCycle((int) $data['numberCycle']);
+        }
 
         $em->flush();
 
