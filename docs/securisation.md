@@ -58,10 +58,16 @@ Analyse organisée selon l'OWASP Top 10 (2021), rapportée concrètement au code
   manuelle (`AuthController::serializeUser`, `ApiUserController::serialize`) — le champ
   `password` n'y figure jamais.
 
+**Couvert (corrigé pendant cet audit, TLS local)** :
+- `frontend/nginx.conf` écoute désormais en HTTPS (certificat auto-signé, `frontend/certs/`,
+  jamais commité) sur le port interne 8443, publié `127.0.0.1:3443:8443`
+  (`docker-compose.yml`) — voir section 9. **Limite assumée** : ce certificat est auto-signé,
+  valable pour du test local uniquement ; en l'absence de déploiement réel du projet, aucune
+  terminaison TLS avec certificat de confiance (Let's Encrypt ou équivalent) n'a été mise en
+  place — voir section 9 pour la distinction et ce qu'il faudrait faire au moment d'un
+  déploiement réel.
+
 **Reste exposé** :
-- Aucune terminaison TLS configurée : `backend/apache-vhost.conf` et `frontend/nginx.conf`
-  n'écoutent que sur le port 80, `docker-compose.yml` ne mappe aucun port 443. Les identifiants
-  et le JWT circulent en clair sur le réseau dans la configuration actuelle. **[RECOMMANDÉ]**
 - Aucun chiffrement au repos des données en base MySQL. **[RECOMMANDÉ]**, voir section 3.
 - Secret JWT committé dans l'historique git — traité en détail en section 5 (corrigé pendant
   cet audit, avec la limite de la correction expliquée).
@@ -196,7 +202,7 @@ croisement des deux, état constaté dans le dépôt à la date de rédaction.
 
 | # | Risque | Probabilité | Impact | Criticité | État | Mesure préventive | Mesure corrective |
 |---|---|---|---|---|---|---|---|
-| 1 | Absence de TLS (identifiants/JWT en clair sur le réseau) | Forte | Fort | **Élevée** | À FAIRE | Terminer TLS en amont (reverse proxy/LB), forcer redirection HTTP→HTTPS | Certificats (Let's Encrypt ou équivalent), renouvellement automatisé |
+| 1 | Absence de TLS (identifiants/JWT en clair sur le réseau) | Forte | Fort | **Élevée** | **Partiellement traité** — TLS local auto-signé en place (§9), pas de certificat de confiance (projet non déployé) | Terminer TLS en amont (reverse proxy/LB), forcer redirection HTTP→HTTPS | Certificats (Let's Encrypt ou équivalent), renouvellement automatisé, au moment d'un déploiement réel |
 | 2 | Vol de JWT par XSS (`localStorage`, `AuthContext.jsx`) | Moyenne | Fort | **Élevée** | Assumé (voir Q2) | CSP stricte (posée §1/A05), échappement systématique (React le fait par défaut) | Révocation de session non disponible aujourd'hui — réduire le TTL, envisager migration cookie `HttpOnly` |
 | 3 | Absence de sauvegarde de la base de données | Moyenne | Fort | **Élevée** | À FAIRE | Sauvegardes automatisées chiffrées, testées régulièrement | Procédure de restauration documentée et testée |
 | 4 | Secret JWT (passphrase) exposé dans l'historique Git | Forte (avéré) | Moyen | Moyenne | **Corrigé** | Ne jamais versionner de secret ; `.gitignore` dès l'initialisation du projet | Rotation effectuée : nouvelle passphrase, paire de clés régénérée, tokens antérieurs invalidés. Résiduel : l'ancienne valeur subsiste dans l'historique, sans impact puisqu'elle n'est plus en usage. Nettoyage d'historique jugé non nécessaire (dépôt privé). |
@@ -209,6 +215,7 @@ croisement des deux, état constaté dans le dépôt à la date de rédaction.
 | 11 | CSP absente (XSS facilité si une faille d'injection HTML apparaît) | Faible | Moyen | Faible/Moyenne | **Corrigé** | CSP posée et testée contre `/api/docs` et le frontend React (§1/A05) | — |
 | 12 | Absence de chiffrement au repos (base MySQL) | Faible | Fort | Moyenne | À FAIRE | Chiffrement disque au niveau infrastructure (LUKS, chiffrement natif du fournisseur cloud) | Migration vers un hébergement avec chiffrement natif |
 | 13 | Panne du conteneur MySQL unique (pas de réplication) | Faible | Fort | Moyenne | Proportionné à l'échelle actuelle | Surveillance de disponibilité | Réplication/managed database avant montée en charge |
+| 14 | MySQL et backend publiés directement sur l'hôte (`0.0.0.0`), conteneurs backend/frontend en root, un seul stage de build backend | Moyenne | Fort | **Élevée** | **Corrigé** | Réseau Docker segmenté, ports restreints, utilisateurs non-root | Voir section 9 pour le détail des correctifs et leur vérification |
 
 **Justification des cotations les plus élevées** :
 - **#1 (TLS absent)** coté Fort/Fort : l'application traite des identifiants de connexion et un
@@ -558,10 +565,69 @@ S ≈ demi-journée, M ≈ 1-2 jours, L ≈ plusieurs jours).
 | 6 | ~~Ajouter un `.dockerignore` backend~~ **Fait** | — | §1 |
 | 7 | Merger `feature-security` vers `main`/`develop` (cherry-pick déjà effectué et revérifié : en-têtes/CSP/CORS/rate-limiting/validation/dépendances, retrait de `backend/.env` du suivi git) | S | §1/§5 |
 | 8 | Décider et documenter le traitement de `isVerified` (blocage effectif ou choix assumé) | S | §1 |
-| 9 | Ajouter PHPStan en CI (niveau progressif) | M | §5 |
+| 9 | ~~Ajouter PHPStan en CI (niveau progressif)~~ **Fait** — PHPStan, PHP-CS-Fixer, PHPMD, PHPCPD via `jakzal/phpqa`, job `code-quality` bloquant | — | §5 |
 | 10 | Rédiger le registre des traitements (document externe au code) | S | §4 |
 | 11 | Nettoyer l'historique git de l'ancienne valeur de `JWT_PASSPHRASE` si la sensibilité résiduelle le justifie | S | §5 |
 | 12 | Poser les prérequis (HDS, AIPD, consentement explicite, chiffrement colonne) avant tout développement des modules diagnostic/tracker d'émotions | L | §4 |
+
+---
+
+## 9. Conteneurisation Docker
+
+Section ajoutée après un audit spécifique de `backend/Dockerfile`, `frontend/Dockerfile` et
+`docker-compose.yml`, comparés au projet **BLOC4_CTGL_group** (autre projet du même cursus,
+Spring Boot/Angular) pris comme référence des mêmes principes de durcissement, transposés ici
+à la stack PHP/Apache + Nginx. Tout ce qui suit a été vérifié par reconstruction complète
+(`docker compose down && up -d --build`) et un scénario réel inscription → connexion →
+`/api/me` → panneau admin rejoué avec succès après chaque changement.
+
+### État avant/après
+
+| Pratique | Avant | Après | Fichier |
+|---|---|---|---|
+| Build multi-stage backend | Un seul stage (`php:8.4-apache`), Composer et ses fichiers de build restaient dans l'image livrée | Stage `composer:2` dédié à `composer install` ; seul `vendor/` passe dans l'image finale | `backend/Dockerfile` |
+| Build multi-stage frontend | Déjà en place (`node:22-alpine` → `nginx:alpine`) | Inchangé sur ce point | `frontend/Dockerfile` |
+| Utilisateur du conteneur backend | Root (aucune directive `USER`) | `www-data` (utilisateur déjà présent dans l'image officielle) ; Apache déplacé du port 80 au port 8080 non privilégié pour permettre le non-root | `backend/Dockerfile`, `backend/apache-vhost.conf` |
+| Utilisateur du conteneur frontend | Root (`nginx:alpine` standard) | `nginxinc/nginx-unprivileged:alpine`, UID 101, ports déplacés à 8080 (HTTP interne) / 8443 (HTTPS) | `frontend/Dockerfile`, `frontend/nginx.conf` |
+| Image de base à jour | `apt-get update` servait uniquement à installer de nouveaux paquets | `apt-get upgrade -y` / `apk upgrade --no-cache` explicites avant toute installation, sur les deux Dockerfiles — une image de base non patchée rend un scan de vulnérabilités bloquant perpétuellement rouge sur des CVE non corrigeables par le projet | `backend/Dockerfile`, `frontend/Dockerfile` |
+| Exposition MySQL | `ports: ["3307:3306"]` — joignable depuis n'importe quelle interface réseau de la machine | Aucun `ports:` — MySQL n'est joignable que par le backend, sur le réseau Docker interne `back` | `docker-compose.yml` |
+| Exposition backend | `ports: ["8080:80"]` — publié sur `0.0.0.0` | `ports: ["127.0.0.1:8080:8080"]` — accessible uniquement depuis la machine locale (utile pour tester l'API directement), plus depuis le réseau | `docker-compose.yml` |
+| Exposition frontend | `ports: ["3443:443"]` — publié sur `0.0.0.0` | `ports: ["127.0.0.1:3443:8443"]` — même URL côté utilisateur (`https://localhost:3443`), plus joignable depuis l'extérieur de la machine | `docker-compose.yml` |
+| Segmentation réseau | Un seul réseau Docker Compose par défaut, aucune isolation entre services | Réseau `back` (`internal: true` — MySQL et backend uniquement, aucune sortie possible) et réseau `front` (backend et frontend) | `docker-compose.yml` |
+| Durcissement conteneur | Aucun | `security_opt: ["no-new-privileges:true"]` sur les 3 services — un binaire setuid compromis dans un conteneur ne peut plus gagner de droits supplémentaires | `docker-compose.yml` |
+| Healthcheck backend | Absent | Ajouté : requête sur `/api/resources` (route publique existante) via `php -r`, sans installer d'outil supplémentaire dans l'image | `docker-compose.yml` |
+
+### Points d'attention techniques rencontrés (et leur résolution)
+
+- **Logs Apache en non-root** : `chown` explicite de `/var/log/apache2` et `/var/run/apache2`
+  vers `www-data` pendant le build, en plus de `var/` et `config/jwt`. Constat après coup :
+  l'image officielle `php:8.4-apache` symlink déjà `access.log`/`error.log` vers
+  `/dev/stdout`/`/dev/stderr` avec le dossier appartenant à `www-data` — le `chown` explicite
+  était donc redondant avec le comportement par défaut, mais laissé en place : dépendre d'un
+  défaut non documenté de l'image de base est fragile, un `chown` explicite ne l'est pas.
+- **Certificat TLS local illisible en non-root** : `frontend/certs/localhost-key.pem`
+  (certificat auto-signé de test, jamais commité) était en permissions `600`, lisible
+  seulement par l'utilisateur du poste de développement. Une fois Nginx passé en UID 101,
+  cette clé devenait illisible depuis le conteneur (bind mount : les permissions du fichier
+  hôte s'appliquent telles quelles). Corrigé en `644` — acceptable car ce certificat est un
+  artefact de test local, pas un secret de production.
+- **Script d'entrée JWT** : `backend/docker-entrypoint.sh` faisait un `chown -R www-data
+  config/jwt` après génération des clés JWT au démarrage. Ce `chown` échouait silencieusement
+  en non-root (`Operation not permitted`) et aurait fait planter le conteneur (`set -e`) — le
+  dossier appartient déjà à `www-data` depuis le build, la ligne a été retirée plutôt que
+  corrigée, elle n'avait plus de raison d'être.
+
+### Ce qui reste volontairement différent du modèle de référence
+
+- **Pas de reverse-proxy Nginx frontal séparé** : dans BLOC4_CTGL, un vrai déploiement VPS
+  place un Nginx hôte (hors Docker Compose) devant backend et frontend, terminaison TLS
+  Let's Encrypt incluse. cesiZen n'étant pas déployé, ce composant n'existe pas encore ;
+  le rôle de point d'entrée unique HTTPS est actuellement tenu par le conteneur `frontend`
+  lui-même (Nginx conteneurisé, TLS auto-signé local — voir section 1/A02). À revoir au
+  moment d'un déploiement réel.
+- **Pas de scan Trivy en CI** : BLOC4_CTGL bloque la publication d'image sur une vulnérabilité
+  CRITICAL/HIGH corrigeable détectée par Trivy. cesiZen n'a pas de pipeline de publication
+  d'image (`CD`) — voir `partie4.md` §5, qui documente cet écart séparément.
 
 ---
 
@@ -655,3 +721,18 @@ dépendances (`composer audit`) : `composer audit` revérifié à 0 avis avant e
 de l'image Docker en conditions `--no-dev`, 54 tests rejoués, et l'incident de cherry-pick
 (ligne `symfony/rate-limiter` perdue puis restaurée) détecté par comparaison explicite avec le
 commit source plutôt que par simple confiance dans la résolution automatique de Git.
+
+**Q9. Pourquoi ces choix de durcissement Docker (multi-stage, non-root, réseau segmenté)
+plutôt qu'une configuration plus simple ?**
+Ce sont des pratiques ANSSI standard (moindre privilège, défense en profondeur), transposées
+depuis un autre projet du cursus (BLOC4_CTGL_group, Spring Boot/Angular) qui applique les mêmes
+principes — la logique n'est pas spécifique au framework. Concrètement : le non-root limite ce
+qu'un processus compromis (faille applicative, dépendance vulnérée) peut faire sur le système
+hôte du conteneur ; la segmentation réseau (`internal: true` sur le réseau contenant MySQL)
+garantit qu'une compromission du frontend ne donne pas un accès réseau direct à la base ; le
+retrait de l'exposition MySQL supprime une surface d'attaque qui n'a jamais eu besoin d'exister
+côté hôte, l'application y accédant uniquement via le réseau Docker interne. Le compromis assumé
+en contrepartie : perte de l'accès direct à MySQL depuis un client SQL graphique sur le poste de
+développement — l'inspection passe désormais par `docker compose exec db mysql -ucesizen -p
+cesizen`. Sur un projet non déployé, ce compromis est acceptable ; il matérialise malgré tout la
+même discipline que celle attendue en production.
