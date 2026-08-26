@@ -28,7 +28,7 @@ jobs:
 
     steps:
       - name: Récupération du code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Installation de PHP 8.4
         uses: shivammathur/setup-php@v2
@@ -38,7 +38,7 @@ jobs:
           coverage: none
 
       - name: Cache des dépendances Composer
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: backend/vendor
           key: composer-${{ hashFiles('backend/composer.lock') }}
@@ -92,7 +92,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Récupération du code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       # Nécessaire pour composer install ci-dessous : le runner ubuntu-latest
       # embarque bien un PHP par défaut, mais pas garanti en 8.4 ni avec les
@@ -105,7 +105,7 @@ jobs:
           coverage: none
 
       - name: Cache des dépendances Composer
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: backend/vendor
           key: composer-${{ hashFiles('backend/composer.lock') }}
@@ -144,10 +144,10 @@ jobs:
     name: Build frontend (React/Vite)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Installation de Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: '22'
           cache: 'npm'
