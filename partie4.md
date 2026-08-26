@@ -245,13 +245,15 @@ Les trois garde-fous non négociables du `deploy.sh` de BLOC4_CTGL, transposable
 
 ## 8. Séparation TLS test-local vs production
 
-**État : [EN COURS]** sur la branche `feature-security` (diff non commité au moment de la
-rédaction) :
+**État : [FAIT]** sur `feature-security` :
 
-- `frontend/nginx.conf` : ajout d'un bloc `server { listen 443 ssl; ... }` avec
-  `ssl_certificate /etc/nginx/certs/localhost.pem` + redirection `80 → 443`.
-- `docker-compose.yml` : montage `./frontend/certs:/etc/nginx/certs:ro` + publication du
-  port `3443:443`.
+- `frontend/nginx.conf` : bloc `server { listen 443 ssl; ... }` avec
+  `ssl_certificate /etc/nginx/certs/localhost.pem`.
+- `docker-compose.yml` : montage `./frontend/certs:/etc/nginx/certs:ro`, seul le port
+  `3443:443` est publié sur l'hôte — le port 80 (HTTP en clair) n'est **plus exposé du tout**,
+  contrairement à un premier essai qui l'avait laissé accessible en parallèle sur `3000`.
+  Choix assumé : pour ce projet, l'accès local passe uniquement par HTTPS, pas par un HTTP en
+  clair laissé disponible « en plus ».
 - `.gitignore` : ajout de `frontend/certs/` — les certificats ne sont jamais commités.
 
 Différence avec le modèle BLOC4_CTGL à considérer avant de finaliser : leur approche

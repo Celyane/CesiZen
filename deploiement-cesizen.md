@@ -25,7 +25,7 @@ docker compose ps
 
 | Service | URL | Rôle |
 |---|---|---|
-| Frontend React | http://localhost:3000 | Interface utilisateur (Nginx) |
+| Frontend React | https://localhost:3443 | Interface utilisateur (Nginx, TLS auto-signé local — accepter l'avertissement du navigateur) |
 | API Symfony | http://localhost:8080/api | API REST (Apache + PHP 8.4) |
 | MySQL | localhost:3307 | Base de données |
 
@@ -39,7 +39,7 @@ docker compose ps
         Navigateur
              |
              v
-   [ frontend ] Nginx  :3000
+   [ frontend ] Nginx  :3443 (HTTPS, certificat auto-signé local)
       |  sert le build React (fichiers statiques)
       |  relaie /api  ------------------>  [ backend ] Apache + PHP 8.4  :8080
                                                  |  Symfony 8 + API Platform + JWT
@@ -330,7 +330,7 @@ TOKEN="<coller le token>"
 curl -H "Authorization: Bearer $TOKEN" http://localhost:8080/api
 ```
 
-Démonstration équivalente depuis l'interface : http://localhost:3000, onglet Réseau des outils de développement, connexion → requête `/api/login` en 200 avec le token en réponse.
+Démonstration équivalente depuis l'interface : https://localhost:3443, onglet Réseau des outils de développement, connexion → requête `/api/login` en 200 avec le token en réponse.
  
 ---
 
