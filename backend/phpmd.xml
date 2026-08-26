@@ -1,0 +1,43 @@
+<?xml version="1.0"?>
+<ruleset name="CesiZen"
+         xmlns="http://pmd.sf.net/ruleset/1.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://pmd.sf.net/ruleset/1.0.0 http://pmd.sf.net/ruleset_xml_schema.xsd">
+
+    <description>
+        Ruleset PHPMD pour le backend CesiZen (Symfony/API Platform).
+
+        Écarts volontaires par rapport aux rulesets par défaut :
+        - "naming" exclu en bloc : ShortVariable signale $id, $em, $ex comme trop courts
+          alors que ce sont des conventions Symfony/Doctrine standard dans tout le projet.
+          Les renommer en masse n'apporterait aucune lisibilité réelle.
+        - StaticAccess exclu : le socle EasyAdmin (MenuItem::linkToCrud, etc.) impose des
+          appels statiques par conception ; ce n'est pas un couplage évitable ici.
+        - CyclomaticComplexity/NPathComplexity relevés à 12/450 (défaut 10/200) : plusieurs
+          contrôleurs API font des mises à jour partielles par une séquence de
+          `if (isset($data[...]))` indépendants — chaque branche est triviale et isolée,
+          la complexité mesurée ne reflète pas une difficulté réelle de lecture. Un seuil
+          par défaut forcerait un découpage artificiel de ces méthodes sans gain de clarté.
+    </description>
+
+    <rule ref="rulesets/cleancode.xml">
+        <exclude name="StaticAccess" />
+    </rule>
+    <rule ref="rulesets/codesize.xml">
+        <exclude name="CyclomaticComplexity" />
+        <exclude name="NPathComplexity" />
+    </rule>
+    <rule ref="rulesets/codesize.xml/CyclomaticComplexity">
+        <properties>
+            <property name="reportLevel" value="12" />
+        </properties>
+    </rule>
+    <rule ref="rulesets/codesize.xml/NPathComplexity">
+        <properties>
+            <property name="minimum" value="450" />
+        </properties>
+    </rule>
+    <rule ref="rulesets/controversial.xml" />
+    <rule ref="rulesets/design.xml" />
+    <rule ref="rulesets/unusedcode.xml" />
+</ruleset>

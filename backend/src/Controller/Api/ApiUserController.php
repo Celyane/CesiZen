@@ -35,7 +35,7 @@ class ApiUserController extends AbstractController
     #[Route('', name: 'api_user_list', methods: ['GET'])]
     public function list(UserRepository $repo): JsonResponse
     {
-        return $this->json(array_map(fn($u) => $this->serialize($u), $repo->findAll()));
+        return $this->json(array_map(fn ($u) => $this->serialize($u), $repo->findAll()));
     }
 
     #[Route('', name: 'api_user_create', methods: ['POST'])]

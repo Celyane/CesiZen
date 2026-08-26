@@ -36,11 +36,17 @@ php bin/console doctrine:database:create
 php bin/console doctrine:migrations:migrate --no-interaction
 ```
 
+Installer une fois le certificat local de confiance (à ne faire qu'une seule fois par poste) :
+
+```bash
+symfony server:ca:install
+```
+
 Démarrer le serveur :
 
 ```bash
-symfony server:start --no-tls -d
-# → http://127.0.0.1:8000
+symfony server:start -d
+# → https://127.0.0.1:8000
 ```
 
 > Pour passer un compte en admin :
@@ -57,7 +63,7 @@ npm run dev
 # → http://localhost:5173
 ```
 
-> Le fichier `vite.config.js` proxifie `/api` vers `http://127.0.0.1:8000`. Ne pas appeler le backend directement depuis le navigateur.
+> Le fichier `vite.config.js` proxifie `/api` vers `https://127.0.0.1:8000`. Ne pas appeler le backend directement depuis le navigateur.
 
 ---
 

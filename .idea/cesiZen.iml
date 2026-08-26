@@ -301,6 +301,7 @@
       <excludeFolder url="file://$MODULE_DIR$/backend/vendor/twig/twig" />
       <excludeFolder url="file://$MODULE_DIR$/backend/vendor/webmozart/assert" />
       <excludeFolder url="file://$MODULE_DIR$/backend/vendor/willdurand/negotiation" />
+      <excludeFolder url="file://$MODULE_DIR$/backend/vendor/symfony/rate-limiter" />
     </content>
     <orderEntry type="inheritedJdk" />
     <orderEntry type="sourceFolder" forTests="false" />
