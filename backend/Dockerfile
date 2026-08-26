@@ -35,4 +35,8 @@ RUN cp .env.example .env \
     && APP_ENV=prod php bin/console cache:warmup --no-interaction \
     && chown -R www-data:www-data var config/jwt
 
+RUN chmod +x docker-entrypoint.sh
+ENTRYPOINT ["./docker-entrypoint.sh"]
+CMD ["apache2-foreground"]
+
 EXPOSE 80
