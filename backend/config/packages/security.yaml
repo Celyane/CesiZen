@@ -21,6 +21,9 @@ security:
             pattern: ^/api/login
             stateless: true
             user_checker: App\Security\UserChecker
+            login_throttling:
+                max_attempts: 5
+                interval: '1 minute'
             json_login:
                 check_path: /api/login
                 username_path: email

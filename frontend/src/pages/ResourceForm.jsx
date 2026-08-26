@@ -124,7 +124,7 @@ export default function ResourceForm() {
         </div>
 
         <div className="form-group">
-          <label htmlFor="image">URL de l'image (optionnel)</label>
+          <label htmlFor="image">URL de l’image (optionnel)</label>
           <input
             id="image"
             name="image"

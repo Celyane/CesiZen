@@ -22,19 +22,6 @@ updates:
     commit-message:
       prefix: "chore"
 
-  # Images Docker de base
-  - package-ecosystem: "docker"
-    directory: "/backend"
-    schedule:
-      interval: "monthly"
-    labels: ["évolution"]
-
-  - package-ecosystem: "docker"
-    directory: "/frontend"
-    schedule:
-      interval: "monthly"
-    labels: ["évolution"]
-
   # Actions utilisées par la CI
   - package-ecosystem: "github-actions"
     directory: "/"

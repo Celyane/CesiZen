@@ -6,7 +6,19 @@
   <component name="ChangeListManager">
     <list default="true" id="617dda91-672f-49c9-ba78-bd1863f36df9" name="Changes" comment="Merge pull request #15 from Celyane/feature-veille&#10;&#10;chore: configuire dependabot pour la veille des dependances">
       <changelist_data name="Célyane" email="celyanecc@gmail.com" date="1770379072000" automatic="true" />
+      <change beforePath="$PROJECT_DIR$/.idea/cesiZen.iml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/cesiZen.iml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/php.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/php.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend/Dockerfile" beforeDir="false" afterPath="$PROJECT_DIR$/backend/Dockerfile" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend/apache-vhost.conf" beforeDir="false" afterPath="$PROJECT_DIR$/backend/apache-vhost.conf" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend/composer.json" beforeDir="false" afterPath="$PROJECT_DIR$/backend/composer.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend/composer.lock" beforeDir="false" afterPath="$PROJECT_DIR$/backend/composer.lock" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend/config/packages/nelmio_cors.yaml" beforeDir="false" afterPath="$PROJECT_DIR$/backend/config/packages/nelmio_cors.yaml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend/config/packages/security.yaml" beforeDir="false" afterPath="$PROJECT_DIR$/backend/config/packages/security.yaml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend/config/reference.php" beforeDir="false" afterPath="$PROJECT_DIR$/backend/config/reference.php" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend/src/Controller/Api/AuthController.php" beforeDir="false" afterPath="$PROJECT_DIR$/backend/src/Controller/Api/AuthController.php" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend/src/Entity/User.php" beforeDir="false" afterPath="$PROJECT_DIR$/backend/src/Entity/User.php" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/frontend/nginx.conf" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/nginx.conf" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -324,6 +336,7 @@
       <path value="$PROJECT_DIR$/backend/vendor/phpdocumentor/reflection-docblock" />
       <path value="$PROJECT_DIR$/backend/vendor/phpdocumentor/type-resolver" />
       <path value="$PROJECT_DIR$/backend/vendor/phpdocumentor/reflection-common" />
+      <path value="$PROJECT_DIR$/backend/vendor/symfony/rate-limiter" />
     </include_path>
   </component>
   <component name="ProjectColorInfo">{
@@ -394,6 +407,8 @@
       <workItem from="1782112443052" duration="9005000" />
       <workItem from="1787154515394" duration="1205000" />
       <workItem from="1787237501316" duration="7560000" />
+      <workItem from="1787392915259" duration="12100000" />
+      <workItem from="1787498085721" duration="327000" />
     </task>
     <servers />
   </component>

@@ -15,13 +15,4 @@ class UserRepository extends ServiceEntityRepository
     {
         parent::__construct($registry, User::class);
     }
-
-    public function findOneById(int $id): ?User
-    {
-        return $this->createQueryBuilder('u')
-            ->andWhere('u.id = :id')
-            ->setParameter('id', $id)
-            ->getQuery()
-            ->getOneOrNullResult();
-    }
 }
