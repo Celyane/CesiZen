@@ -42,6 +42,17 @@ jobs:
           path: backend/vendor
           key: composer-${{ hashFiles('backend/composer.lock') }}
 
+      - name: Préparation du fichier .env
+        working-directory: backend
+        # composer install déclenche @auto-scripts (cache:clear, assets:install...),
+        # qui boot le noyau Symfony et exige que .env existe physiquement — même
+        # avant que les vraies variables d'environnement (APP_ENV, DATABASE_URL...)
+        # ne soient injectées par les étapes suivantes. .env est gitignored (secrets
+        # locaux), un checkout CI frais ne l'a donc jamais : sans cette étape,
+        # composer install échoue avec "Unable to read the .env environment file"
+        # (même correctif que backend/Dockerfile pour la même raison).
+        run: cp .env.example .env
+
       - name: Installation des dépendances
         working-directory: backend
         run: composer install --no-interaction --prefer-dist
@@ -82,11 +93,32 @@ jobs:
       - name: Récupération du code
         uses: actions/checkout@v4
 
-      # jakzal/phpqa embarque PHPStan, PHP-CS-Fixer, PHPMD et PHPCPD dans une
-      # seule image : pas de composer require dev supplémentaire, un seul
-      # binaire à faire évoluer. Chaque outil est bloquant : un écart sur le
-      # code déjà en place ferait échouer ce job (voir backend/phpstan.neon,
-      # .php-cs-fixer.php, phpmd.xml pour les seuils retenus et leur raison).
+      # Nécessaire pour composer install ci-dessous : le runner ubuntu-latest
+      # embarque bien un PHP par défaut, mais pas garanti en 8.4 ni avec les
+      # extensions requises (intl, zip) — même image que le job tests-backend.
+      - name: Installation de PHP 8.4
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          extensions: pdo_mysql, intl, zip
+          coverage: none
+
+      - name: Cache des dépendances Composer
+        uses: actions/cache@v4
+        with:
+          path: backend/vendor
+          key: composer-${{ hashFiles('backend/composer.lock') }}
+
+      # PHPStan a besoin de l'autoloader pour résoudre les classes (Symfony,
+      # Doctrine, EasyAdmin...) — sans vendor/, tout le src/ ressort en
+      # class.notFound. .env avant composer install pour la même raison que
+      # dans le job tests-backend (@auto-scripts boot le noyau Symfony).
+      - name: Installation des dépendances backend
+        working-directory: backend
+        run: |
+          cp .env.example .env
+          composer install --no-interaction --prefer-dist
+
       - name: PHPStan (analyse statique, niveau 3)
         run: |
           docker run --rm -v "${{ github.workspace }}/backend:/project" -w /project \

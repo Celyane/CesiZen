@@ -3,3 +3,9 @@ parameters:
     paths:
         - src
     tmpDir: var/cache/phpstan
+    # Explicite plutôt que de compter sur la détection automatique de
+    # composer.json : constaté peu fiable selon le contexte d'invocation
+    # (fonctionne sur un dépôt de dev avec historique de cache, échoue en
+    # ~555 erreurs class.notFound sur un checkout tout juste cloné).
+    bootstrapFiles:
+        - vendor/autoload.php
