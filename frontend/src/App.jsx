@@ -104,7 +104,7 @@ export default function App() {
                 element={
                   <div className="page">
                     <h2>Page introuvable</h2>
-                    <p>La page que vous recherchez n'existe pas.</p>
+                    <p>La page que vous recherchez n’existe pas.</p>
                   </div>
                 }
               />
