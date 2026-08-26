@@ -20,9 +20,19 @@ COPY composer.json composer.lock symfony.lock ./
 RUN composer install --no-dev --no-scripts --no-interaction --prefer-dist
 
 COPY . .
-RUN composer dump-autoload --optimize \
+# Symfony's Dotenv::bootEnv() requires the .env file to physically exist,
+# and its values are resolved eagerly while compiling the prod container
+# (DATABASE_URL, DEFAULT_URI, JWT_PASSPHRASE...) even for services never
+# used at request time. .env itself holds real local secrets and is
+# excluded via .dockerignore, so .env.example (committed, placeholder
+# values only, same shape) is copied in its place. docker-compose still
+# overrides APP_ENV/APP_SECRET/DATABASE_URL with the real runtime values —
+# only the keys it doesn't override (DEFAULT_URI, JWT_PASSPHRASE, CORS...)
+# keep these placeholders, harmless for the routes that don't need them.
+RUN cp .env.example .env \
+    && composer dump-autoload --optimize \
     && mkdir -p var config/jwt \
-    && APP_ENV=prod APP_SECRET=build php bin/console cache:warmup --no-interaction || true \
+    && APP_ENV=prod php bin/console cache:warmup --no-interaction \
     && chown -R www-data:www-data var config/jwt
 
 EXPOSE 80
