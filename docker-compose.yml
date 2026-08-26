@@ -32,7 +32,10 @@ services:
     ports:
       # Restreint à la machine locale : utile pour appeler l'API directement
       # (Swagger, tests manuels) sans jamais être joignable depuis le réseau.
+      # Publié sur les deux loopbacks (v4 et v6) : "localhost" peut se résoudre
+      # en ::1 en premier selon le système, et échouerait sinon.
       - "127.0.0.1:8080:8080"
+      - "[::1]:8080:8080"
     healthcheck:
       test: ["CMD", "php", "-r", "exit(@file_get_contents('http://localhost:8080/api/resources') !== false ? 0 : 1);"]
       interval: 15s
@@ -44,7 +47,10 @@ services:
     build: ./frontend
     security_opt: [ "no-new-privileges:true" ]
     ports:
+      # Deux loopbacks pour que "localhost" fonctionne quelle que soit la
+      # résolution DNS locale (v4 ou v6) — voir remarque équivalente ci-dessus.
       - "127.0.0.1:3443:8443"
+      - "[::1]:3443:8443"
     volumes:
       - ./frontend/certs:/etc/nginx/certs:ro
     depends_on:

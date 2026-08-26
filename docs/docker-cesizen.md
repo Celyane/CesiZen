@@ -38,9 +38,9 @@ fonctionnent sur n'importe quel serveur qui a Docker).
         Navigateur
              |
              v (HTTPS, certificat auto-signé)
-   [ frontend ]  Nginx non-root, 127.0.0.1:3443 -> 8443
+   [ frontend ]  Nginx non-root, localhost:3443 -> 8443
       |  sert le build React (fichiers statiques)
-      |  relaie /api  ------------------>  [ backend ]  Apache + PHP 8.4, 127.0.0.1:8080 -> 8080
+      |  relaie /api  ------------------>  [ backend ]  Apache + PHP 8.4, localhost:8080 -> 8080
       |                                          |  Symfony 8 + API Platform + JWT
       |                                          v
       |                                    [ db ]  MySQL 8.0 — AUCUN port publié sur l'hôte
@@ -58,10 +58,12 @@ fonctionnent sur n'importe quel serveur qui a Docker).
   physiquement pas atteindre la base de données, même s'il essayait (vérifié : une requête du
   conteneur frontend vers `db:3306` échoue avec *bad address*, le nom n'est même pas résolu).
 
-**Exposition minimale sur l'hôte** — seuls deux ports sont publiés, et uniquement sur
-`127.0.0.1` (jamais `0.0.0.0`, jamais accessible depuis le réseau) :
-- `127.0.0.1:3443` → frontend (HTTPS) : le seul point d'entrée pensé pour un usage normal.
-- `127.0.0.1:8080` → backend (HTTP) : accès direct à l'API depuis la machine hôte uniquement,
+**Exposition minimale sur l'hôte** — seuls deux ports sont publiés, et uniquement sur les
+interfaces de boucle locale `127.0.0.1` et `::1` (jamais `0.0.0.0`, jamais accessible depuis le
+réseau). Les deux sont publiées explicitement pour que `localhost` fonctionne quelle que soit la
+résolution DNS locale (certains systèmes résolvent `localhost` en IPv6 `::1` en priorité) :
+- `localhost:3443` → frontend (HTTPS) : le seul point d'entrée pensé pour un usage normal.
+- `localhost:8080` → backend (HTTP) : accès direct à l'API depuis la machine hôte uniquement,
   utile pour du test manuel (Swagger, `curl`) sans jamais être joignable depuis l'extérieur.
 
 **La base de données ne publie aucun port.** Elle n'est joignable ni depuis l'hôte, ni depuis
@@ -174,8 +176,8 @@ docker compose ps
 
 | Service | Accès | Rôle |
 |---|---|---|
-| `frontend` | https://127.0.0.1:3443 | Interface utilisateur (accepter l'avertissement de certificat auto-signé) |
-| `backend` | http://127.0.0.1:8080/api | API REST, accès direct pour debug uniquement |
+| `frontend` | https://localhost:3443 | Interface utilisateur (accepter l'avertissement de certificat auto-signé) |
+| `backend` | http://localhost:8080/api | API REST, accès direct pour debug uniquement |
 | `db` | Aucun accès depuis l'hôte | Uniquement joignable par `backend`, sur le réseau interne |
 
 ---
