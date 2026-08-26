@@ -28,7 +28,7 @@ jobs:
 
     steps:
       - name: Récupération du code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Installation de PHP 8.4
         uses: shivammathur/setup-php@v2
@@ -92,7 +92,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Récupération du code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       # Nécessaire pour composer install ci-dessous : le runner ubuntu-latest
       # embarque bien un PHP par défaut, mais pas garanti en 8.4 ni avec les
@@ -144,7 +144,7 @@ jobs:
     name: Build frontend (React/Vite)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Installation de Node
         uses: actions/setup-node@v4
