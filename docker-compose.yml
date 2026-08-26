@@ -1,15 +1,18 @@
 services:
   db:
     image: mysql:8.0
+    security_opt: [ "no-new-privileges:true" ]
     environment:
       MYSQL_DATABASE: cesizen
       MYSQL_USER: cesizen
       MYSQL_PASSWORD: ${DB_PASSWORD}
       MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD}
-    ports:
-      - "3307:3306"
+    # AUCUN "ports:" : la base n'est joignable que par le backend, sur le
+    # réseau interne "back". Pour l'inspecter depuis l'hôte :
+    #   docker compose exec db mysql -ucesizen -p cesizen
     volumes:
       - db_data:/var/lib/mysql
+    networks: [back]
     healthcheck:
       test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-ucesizen", "-pcesizen"]
       interval: 5s
@@ -17,8 +20,7 @@ services:
 
   backend:
     build: ./backend
-    ports:
-      - "8080:80"
+    security_opt: [ "no-new-privileges:true" ]
     environment:
       APP_ENV: prod
       APP_SECRET: ${APP_SECRET}
@@ -26,15 +28,34 @@ services:
     depends_on:
       db:
         condition: service_healthy
+    networks: [back, front]
+    ports:
+      # Restreint à la machine locale : utile pour appeler l'API directement
+      # (Swagger, tests manuels) sans jamais être joignable depuis le réseau.
+      - "127.0.0.1:8080:8080"
+    healthcheck:
+      test: ["CMD", "php", "-r", "exit(@file_get_contents('http://localhost:8080/api/resources') !== false ? 0 : 1);"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
 
   frontend:
     build: ./frontend
+    security_opt: [ "no-new-privileges:true" ]
     ports:
-      - "3443:443"
+      - "127.0.0.1:3443:8443"
     volumes:
       - ./frontend/certs:/etc/nginx/certs:ro
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
+    networks: [front]
+
+networks:
+  front:
+  back:
+    internal: true
 
 volumes:
   db_data:

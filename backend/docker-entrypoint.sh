@@ -7,8 +7,10 @@ set -e
 
 if [ ! -f config/jwt/private.pem ] || [ ! -f config/jwt/public.pem ]; then
     echo "==> Génération des clés JWT (absentes de ce conteneur)"
+    # Le conteneur tourne déjà en www-data (non-root) : config/jwt lui
+    # appartient depuis le build, pas de chown à faire ici — il échouerait
+    # de toute façon (Operation not permitted) sans droits root.
     php bin/console lexik:jwt:generate-keypair --skip-if-exists
-    chown -R www-data:www-data config/jwt
 fi
 
 exec "$@"
