@@ -1,9 +1,10 @@
 # Plan de déploiement de CesiZen
 
-Rapport détaillé de l'état de la chaîne CI/CD et du plan de déploiement, rédigé le 2026-08-26
-après retrait de la conteneurisation Docker du dépôt (fichiers `Dockerfile` et
-`docker-compose.yml` supprimés — décision assumée, voir §5). Ce document reflète le fonctionnement
-réel du dépôt `Celyane/CesiZen` (GitHub, visibilité **publique**), pas une intention.
+Rapport détaillé de l'état de la chaîne CI/CD et du plan de déploiement, mis à jour le 2026-08-26.
+Le déploiement repose sur une conteneurisation Docker (frontend Nginx, backend Apache, base
+MySQL) — voir `docs/docker-cesizen.md` pour le détail de cette architecture. Ce document reflète
+le fonctionnement réel du dépôt `Celyane/CesiZen` (GitHub, visibilité **publique**), pas une
+intention.
 
 ---
 
@@ -17,26 +18,31 @@ réel du dépôt `Celyane/CesiZen` (GitHub, visibilité **publique**), pas une i
    Pull Request vers main
          |
          v
-   +-------------------------------------------+
-   |   GitHub Actions — .github/workflows/ci.yml |
-   |                                             |
-   |  [Tests backend]  [Qualité de code]  [Build |
-   |   PHPUnit + audit    PHPStan/CS-Fixer/       frontend]
-   |   composer            PHPMD/PHPCPD (phpqa)   npm build
-   |     |                    |                    |
-   |     +---------- tous indépendants ------------+
-   +-------------------------------------------+
+   +----------------------------------------------------------------+
+   |   GitHub Actions — .github/workflows/ci.yml                     |
+   |                                                                  |
+   |  [Tests backend]  [Qualité de code]  [Build      |
+   |   PHPUnit + audit    PHPStan/CS-Fixer/       frontend]           |
+   |   composer            PHPMD/PHPCPD (phpqa)   npm build           |
+   |     |                    |                    |                 |
+   |     +---------- tous indépendants -------------+                |
+   |                          |                                      |
+   |                          v                                      |
+   |              [ Build des images Docker ]                        |
+   |               backend + frontend (needs: les 3 précédents)      |
+   +----------------------------------------------------------------+
          |
-   3 checks obligatoires (ruleset GitHub "main")
+   4 checks obligatoires (ruleset GitHub "main")
          |
-   merge autorisé uniquement si les 3 sont verts
+   merge autorisé uniquement si les 4 sont verts
          |
          v
-   main = code validé, prêt à déployer manuellement
+   main = code validé, images Docker construites, prêt à déployer manuellement
 ```
 
-Ce que fait la chaîne aujourd'hui : **intégration continue** (test + qualité + build), pas de
-déploiement continu. Aucune étape ne pousse d'artefact vers un serveur ou un registre.
+Ce que fait la chaîne aujourd'hui : **intégration continue** (test + qualité + build applicatif +
+build des images Docker), pas de déploiement continu. Aucune étape ne pousse d'image vers un
+registre ni ne déploie sur un serveur.
 
 ---
 
@@ -82,13 +88,13 @@ Node 22, `npm ci` (installation stricte depuis `package-lock.json`), puis `npm r
 que le frontend compile — une erreur de build React/TypeScript/Vite non détectée en local est
 bloquée ici avant merge.
 
-### Job supprimé : `build-images`
+### `build-images` — Build des images Docker
 
-Le job qui construisait les images Docker backend/frontend a été retiré le 2026-08-26, en même
-temps que la suppression de `docker-compose.yml`, `backend/Dockerfile`, `backend/compose.yaml` et
-`frontend/Dockerfile` : il n'y a plus rien à construire. Les fichiers de configuration serveur
-(`backend/apache-vhost.conf`, `frontend/nginx.conf`, `.dockerignore` des deux côtés) sont encore
-présents dans le dépôt mais **ne sont plus utilisés par aucune étape** — voir §5 pour leur devenir.
+`needs: [tests-backend, code-quality, build-frontend]` — ne démarre que si les trois jobs
+précédents ont réussi. Construit `backend/Dockerfile` et `frontend/Dockerfile` (`docker build`,
+sans les publier vers un registre) : valide que les deux images sont reproductibles à partir d'un
+checkout propre, indépendamment des tests applicatifs (une dépendance système retirée, par
+exemple, casse ce job sans faire bouger un seul test PHPUnit).
 
 ---
 
@@ -105,15 +111,14 @@ Vérifié directement via l'API GitHub (`gh api repos/Celyane/CesiZen/rulesets`)
 | Pull Request obligatoire avant merge | Oui |
 | Approbations requises | 0 — assumé : projet mené en solo, GitHub interdisant l'auto-approbation, exiger une revue rendrait tout merge impossible. La valeur ajoutée retenue est le passage obligatoire par PR (historique lisible, point d'ancrage pour la CI) |
 | Méthodes de merge autorisées | merge, squash, rebase |
-| Checks obligatoires avant merge | `Tests backend (PHPUnit)`, `Build frontend (React/Vite)`, `Qualité de code backend (phpqa)` |
+| Checks obligatoires avant merge | `Tests backend (PHPUnit)`, `Build frontend (React/Vite)`, `Qualité de code backend (phpqa)`, `Build des images Docker` |
 | Branche à jour exigée avant merge | Oui (`strict_required_status_checks_policy`) — évite qu'une PR validée contre un `main` obsolète casse la branche une fois fusionnée |
 
-**Correctifs appliqués aujourd'hui (2026-08-26) sur ce ruleset**, en écho au retrait de Docker :
-
-- Retrait de `Build des images Docker` des checks obligatoires (le job n'existe plus).
-- Ajout de `Qualité de code backend (phpqa)` comme check obligatoire — il existait dans la CI
-  depuis un moment mais n'était pas exigé au merge, donc une PR pouvait être fusionnée avec des
-  échecs PHPStan/CS-Fixer/PHPMD/PHPCPD non résolus.
+**Historique de ce ruleset (2026-08-26)** : `Qualité de code backend (phpqa)` a été ajouté comme
+check obligatoire — il existait dans la CI depuis un moment mais n'était pas exigé au merge, donc
+une PR pouvait être fusionnée avec des échecs PHPStan/CS-Fixer/PHPMD/PHPCPD non résolus. Le check
+`Build des images Docker` a brièvement été retiré puis réintégré le même jour, le temps de
+reconstruire proprement le dispositif de conteneurisation (voir `docs/docker-cesizen.md`).
 
 **Point d'attention historique, maintenant caduc** : le dépôt était auparavant privé, et GitHub
 n'applique pas les rulesets sur un dépôt privé en compte gratuit. Le dépôt est **désormais public**
@@ -137,92 +142,72 @@ partir de maintenant est immédiatement exposé publiquement**, sans délai de d
 | **Secrets** | `backend/.env.local` (non versionné) | Variables d'environnement CI (jetables, sans lien avec les environnements réels) | Variables d'environnement serveur ou gestionnaire de secrets, jamais dans un fichier versionné |
 | **Base de données** | MySQL local, jeu de données factices | MySQL dédié, réinitialisé à chaque campagne | MySQL managé, sauvegardé (à mettre en place, voir `docs/securite-cesizen.md` §5) |
 | **Déploiement du code** | Serveur de dev local (`symfony serve` / PHP intégré, `npm run dev`) | Code de la branche `develop`, validé par la CI | Code de `main`, validé par PR + CI + tag de version |
-| **HTTPS** | Oui — certificat local de confiance du serveur Symfony CLI (`symfony server:ca:install`, corrigé le 2026-08-26 : le guide désactivait le TLS par erreur alors que `vite.config.js` proxifie déjà vers `https://127.0.0.1:8000`) | Recommandé (certificat auto-signé acceptable) | Obligatoire — certificat valide (Let's Encrypt ou équivalent) |
+| **HTTPS** | Oui — certificat local de confiance du serveur Symfony CLI (`symfony server:ca:install`) hors Docker, ou certificat auto-signé du conteneur `frontend` si la stack Docker est utilisée en local | Certificat auto-signé du conteneur `frontend` (acceptable en recette) | Obligatoire — certificat de confiance (Let's Encrypt ou équivalent) via un reverse proxy en amont des conteneurs |
 | **Accès** | Développeur seul | Équipe / relecteurs | Public |
 
 ---
 
-## 5. Déploiement applicatif — état actuel et plan basique (sans conteneurisation)
+## 5. Déploiement applicatif — conteneurisé (Docker)
 
-La conteneurisation Docker a été retirée du dépôt (décision du 2026-08-26). Le plan ci-dessous
-décrit un déploiement classique, directement transposable au jour où une conteneurisation serait
-réintroduite (les fichiers `apache-vhost.conf` et `nginx.conf` encore présents dans le dépôt
-documentent déjà la configuration serveur attendue et peuvent servir de base).
-
-### Backend (Symfony)
+Le déploiement repose sur les trois conteneurs décrits en détail dans `docs/docker-cesizen.md` :
+`frontend` (Nginx, HTTPS), `backend` (Apache + PHP 8.4), `db` (MySQL 8.0). Résumé opérationnel ici
+; le détail de l'architecture, des choix techniques et des problèmes déjà résolus est dans ce
+second document pour ne pas le dupliquer.
 
 ```bash
 git pull origin main
-composer install --no-dev --optimize-autoloader
-php bin/console lexik:jwt:generate-keypair --skip-if-exists   # première installation uniquement
-php bin/console doctrine:migrations:migrate --no-interaction
-php bin/console cache:clear --env=prod
+# .env à la racine (non versionné) : APP_SECRET, DB_PASSWORD, DB_ROOT_PASSWORD
+docker compose build
+docker compose up -d
+docker compose exec -u www-data backend php bin/console doctrine:migrations:migrate --no-interaction
+docker compose ps
 ```
 
-Variables d'environnement à fournir sur le serveur (jamais dans un fichier versionné) :
-`APP_ENV=prod`, `APP_SECRET`, `DATABASE_URL`, `JWT_PASSPHRASE`, `CORS_ALLOW_ORIGIN` (origine réelle
-du frontend en production).
+Points clés à retenir pour le déploiement (détaillés dans `docs/docker-cesizen.md`) :
+- Seuls deux ports sont publiés, et uniquement sur `127.0.0.1` : `3443` (frontend HTTPS) et `8080`
+  (backend, debug direct). **La base de données ne publie aucun port** — non joignable depuis
+  l'hôte ni depuis l'extérieur, uniquement par le backend sur le réseau interne `back`.
+- Les clés JWT et le certificat TLS ne sont jamais dans l'image ni dans Git.
+- `VITE_API_URL` est injectée **au moment du build** de l'image frontend — changer sa valeur
+  impose de reconstruire l'image (`docker compose build frontend`), pas seulement de la relancer.
 
-### Frontend (React/Vite)
+### Ce qui reste à faire pour aller jusqu'à un vrai déploiement en production
 
-```bash
-npm ci
-npm run build     # génère frontend/dist — fichiers statiques à servir
-```
-
-`VITE_API_URL` est injectée **au moment du build** (pas à l'exécution) — toute modification de
-cette variable impose une reconstruction (`npm run build`) et un redéploiement des fichiers
-statiques.
-
-### En-têtes de sécurité HTTP — à rétablir avant mise en production
-
-Régression identifiée dans `docs/securite-cesizen.md` §2 : les en-têtes CSP/HSTS/`X-Frame-Options`
-etc. étaient posés dans `backend/apache-vhost.conf` et `frontend/nginx.conf`, copiés dans les
-images Docker désormais supprimées. Deux options pour la remise en production, à trancher selon
-l'hébergement retenu :
-
-1. **Si le serveur cible est Apache/Nginx classique** : réutiliser tel quel le contenu de
-   `apache-vhost.conf` / `nginx.conf` dans la configuration du vhost réel.
-2. **Si l'hébergement n'est pas encore fixé (PaaS, etc.)** : poser les en-têtes au niveau
-   applicatif via un `EventListener` Symfony sur `kernel.response` — indépendant du serveur web
-   sous-jacent, donc portable quel que soit l'hébergeur choisi par la suite.
-
-### Ce qui reste à faire pour un déploiement continu (au-delà de l'existant)
-
-La chaîne actuelle s'arrête à la validation (CI). Pour aller jusqu'au déploiement automatisé, deux
-étapes manquent, volontairement non implémentées à ce stade :
-
-1. Publier un artefact versionné (archive du build, ou image de conteneur si la conteneurisation
-   est réintroduite) vers un registre/espace de stockage.
-2. Déclencher, sur un tag de version `vX.Y.Z` poussé sur `main`, un déploiement automatisé sur le
-   serveur cible (SSH + script de déploiement, ou service de déploiement managé selon
-   l'hébergeur).
+1. **Certificat TLS de confiance** : remplacer l'auto-signé par un certificat réel (Let's Encrypt
+   ou équivalent), typiquement via un reverse proxy en amont des conteneurs plutôt que dans
+   l'image `frontend` elle-même.
+2. **Sauvegardes automatisées** du volume `db_data` (voir `docs/securite-cesizen.md`).
+3. **Publier les images vers un registre** (GitHub Container Registry, Docker Hub, ou registre
+   privé) puis déclencher, sur un tag de version `vX.Y.Z`, un déploiement automatisé sur le
+   serveur cible (`docker compose pull && docker compose up -d`) — non implémenté à ce stade.
 
 Ce découpage est un choix assumé : la mise en production reste une décision humaine déclenchée
-après recette, pas un merge automatique.
+après recette, pas un merge automatique. La chaîne CI actuelle relève de l'**intégration
+continue** (elle teste, valide la qualité et construit les images) ; les trois points ci-dessus
+sont ce qui manque pour du **déploiement continu**.
 
 ---
 
 ## 6. Ce qui est déjà en place et fonctionne correctement (à conserver)
 
-- CI à trois jobs indépendants (tests, qualité de code, build frontend), tous requis au merge.
+- CI à quatre jobs (tests, qualité de code, build frontend, build des images Docker), tous requis
+  au merge — vérifiée par un build et un démarrage réel de la stack complète (HTTPS, proxy `/api`,
+  isolation réseau de la base testés manuellement le 2026-08-26).
 - `composer audit --no-dev` bloquant : aucune dépendance backend vulnérable connue ne peut être
   mergée silencieusement.
-- Dependabot actif sur quatre écosystèmes (composer, npm, GitHub Actions, et anciennement Docker
-  — cet écosystème peut être retiré de `.github/dependabot.yml` puisqu'il n'y a plus de
-  `Dockerfile` à surveiller).
-- Génération des clés JWT à l'exécution en CI, jamais versionnées.
-- Ruleset GitHub actif et désormais réellement opposable (dépôt public) : PR obligatoire, 3 checks
+- Dependabot actif sur cinq écosystèmes (composer, npm, Docker backend/frontend, GitHub Actions).
+- Génération des clés JWT à l'exécution (CI et conteneur backend), jamais versionnées.
+- Ruleset GitHub actif et réellement opposable (dépôt public) : PR obligatoire, 4 checks
   bloquants, branche à jour exigée.
 - Cache Composer/npm en CI (clé basée sur les fichiers de lock) — accélère les exécutions
   successives sans risque de dérive de version.
+- Réseau Docker segmenté (`front`/`back`), base de données sans port publié, utilisateurs non-root
+  des deux côtés — voir `docs/docker-cesizen.md` §3 pour le détail.
 
 ## 7. Actions restantes
 
-1. Retirer l'écosystème `docker` de `.github/dependabot.yml` (Dockerfile supprimés).
-2. Rétablir les en-têtes de sécurité HTTP (§5) avant toute mise en production réelle.
-3. Décider et documenter l'hébergement cible (VM classique, PaaS, ou retour à une conteneurisation
-   plus tard) — ce choix conditionne la méthode exacte de déploiement du §5.
-4. Mettre en place des sauvegardes automatisées de la base de données en production.
-5. Si une conteneurisation est réintroduite plus tard : les fichiers `apache-vhost.conf` et
-   `nginx.conf` déjà présents dans le dépôt peuvent servir de base directe.
+1. Remplacer le certificat auto-signé par un certificat de confiance avant tout déploiement public
+   réel (voir §5).
+2. Mettre en place des sauvegardes automatisées du volume `db_data`.
+3. Publier les images vers un registre et automatiser le déploiement sur tag de version, si un
+   déploiement continu est visé.

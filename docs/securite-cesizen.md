@@ -1,8 +1,9 @@
 # Sécurisation de CesiZen
 
 Document de référence sur la sécurisation de l'application (RGPD, bonnes pratiques, gestion des
-secrets, API et tokens, risques). Basé sur une lecture directe du code au 2026-08-26, après le
-retrait de la conteneurisation Docker du dépôt.
+secrets, API et tokens, risques). Basé sur une lecture directe du code au 2026-08-26. Le
+déploiement est conteneurisé (Docker) — voir `docs/docker-cesizen.md` pour l'architecture réseau
+et les mesures de durcissement associées (isolation de la base de données, utilisateurs non-root).
 
 Stack : Symfony 8 + API Platform 4 (backend, `backend/`), React 18 + Vite (frontend, `frontend/`),
 authentification JWT via LexikJWTAuthenticationBundle, MySQL 8.
@@ -83,15 +84,13 @@ fichiers `.env*` inclus.
 
 - CORS restreint par regex d'origine, piloté par la variable d'environnement `CORS_ALLOW_ORIGIN`
   (`nelmio_cors.yaml`) — pas d'origine `*`, pas de valeur figée dans le code.
-- **Régression à corriger** : les en-têtes de sécurité HTTP (CSP, `X-Frame-Options`,
-  `X-Content-Type-Options`, `Referrer-Policy`, `Strict-Transport-Security`) étaient posés dans
-  `backend/apache-vhost.conf` et `frontend/nginx.conf`. Ces deux fichiers **ne sont plus utilisés
-  par rien** depuis la suppression des `Dockerfile` — ils étaient copiés dans les images Docker,
-  qui n'existent plus. **Ces en-têtes ne sont donc actuellement appliqués nulle part.**
-  Action à faire avant tout déploiement réel : soit réintroduire ces fichiers de config dans le
-  serveur web choisi (Apache/Nginx classique), soit les remplacer par un
-  `EventListener` Symfony sur `kernel.response` (indépendant du serveur web, recommandé si
-  l'hébergement final n'est pas encore fixé) — voir `docs/deploiement-cesizen.md`.
+- En-têtes de sécurité HTTP (CSP, `X-Frame-Options`, `X-Content-Type-Options`, `Referrer-Policy`,
+  `Strict-Transport-Security`) posés dans `backend/apache-vhost.conf` et `frontend/nginx.conf`,
+  copiés dans les images Docker et vérifiés en conditions réelles (`curl -I` sur la stack lancée)
+  le 2026-08-26. Actifs sur les deux conteneurs.
+- La base de données ne publie aucun port sur l'hôte (réseau Docker `back`, `internal: true`) :
+  seul le conteneur `backend` peut s'y connecter. Vérifié par un test de connexion direct depuis
+  l'hôte et depuis le conteneur `frontend` — voir `docs/docker-cesizen.md` §2.
 
 ---
 
@@ -156,24 +155,25 @@ automatique n'existe dans le code — la suppression n'est déclenchée que par 
 
 | Risque | Gravité | Mesure en place dans le code |
 |---|---|---|
-| Absence de HTTPS/TLS en production | **Élevée** | Aucune — dépend de l'hébergement choisi ; `Strict-Transport-Security` prêt à s'activer dès que le TLS existe (voir §2, régression à corriger). En local, le serveur Symfony CLI sert désormais en HTTPS (`symfony server:ca:install` + `server:start`, corrigé le 2026-08-26 — incohérence précédente avec `--no-tls` dans le guide) |
-| En-têtes de sécurité HTTP non appliqués (régression post-Docker) | **Élevée** | Configs existantes mais orphelines (`apache-vhost.conf`, `nginx.conf`) — à rebrancher ou remplacer par un listener Symfony |
-| Vol de JWT (XSS) — stockage `localStorage`, pas de révocation | **Moyenne** | TTL court (1h), CSP prévue (voir régression ci-dessus), échappement React par défaut |
+| Absence de certificat TLS de confiance en production | **Élevée** | Le conteneur `frontend` sert déjà en HTTPS avec `Strict-Transport-Security` actif ; le certificat reste auto-signé (test local) — un certificat de confiance (Let's Encrypt ou équivalent) est à poser en amont au moment d'un déploiement public réel |
+| Accès direct à la base de données depuis l'extérieur | Faible (traité) | Aucun port MySQL publié sur l'hôte ; réseau Docker `back` en `internal: true`, seul le conteneur `backend` peut s'y connecter — vérifié |
+| Vol de JWT (XSS) — stockage `localStorage`, pas de révocation | **Moyenne** | TTL court (1h), CSP active sur les deux conteneurs, échappement React par défaut |
 | Consentement RGPD non tracé côté serveur | **Moyenne** | Aucune — case UI seulement, non transmise à l'API |
 | Compte non vérifié (`isVerified`) pleinement fonctionnel | **Moyenne** | Aucune — champ existant mais jamais contrôlé |
 | Validation de mot de passe absente hors `/api/register` | **Moyenne** | Partielle — seule la route d'inscription est protégée |
-| Absence de sauvegarde de la base de données | **Élevée** | Aucune — pas de script/tâche planifiée dans le dépôt |
+| Absence de sauvegarde de la base de données | **Élevée** | Aucune — le volume `db_data` persiste les données mais n'est pas sauvegardé automatiquement |
 | Fuite de secret par commit accidentel | Moyenne (déjà survenu une fois) | `.gitignore` sur tous les `.env*` sensibles, gabarits neutres versionnés, rotation déjà effectuée une fois |
-| Dépendance vulnérable non détectée entre deux cycles | Faible (bien couvert) | `composer audit` bloquant en CI + Dependabot hebdomadaire ; équivalent `npm audit` encore absent côté frontend |
+| Dépendance vulnérable non détectée entre deux cycles | Faible (bien couvert) | `composer audit` bloquant en CI + Dependabot hebdomadaire (composer, npm, images Docker, GitHub Actions) ; équivalent `npm audit` encore absent côté CI |
 | Injection SQL | Faible (bien couvert) | ORM Doctrine systématique, aucun SQL brut |
 | IDOR (modification de la ressource d'un autre utilisateur) | Faible (bien couvert) | Contrôle d'accès au niveau objet dans les contrôleurs |
+| Élévation de privilèges via un conteneur compromis | Faible (bien couvert) | Utilisateurs non-root (`www-data`, UID 101 Nginx) et `no-new-privileges:true` sur `backend`/`frontend` |
 
 ---
 
 ## 6. Actions restantes priorisées
 
-1. Rebrancher les en-têtes de sécurité HTTP (CSP, HSTS, etc.) — cassés depuis le retrait de Docker.
-2. Mettre en place des sauvegardes automatisées de la base MySQL.
+1. Poser un certificat TLS de confiance en amont des conteneurs avant tout déploiement public réel.
+2. Mettre en place des sauvegardes automatisées du volume `db_data`.
 3. Persister le consentement RGPD (`consentGivenAt` sur `User`).
 4. Étendre la validation de mot de passe à `updateMe` et à la création admin.
 5. Bloquer les actions sensibles tant que `isVerified` est faux, ou documenter ce choix comme
