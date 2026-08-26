@@ -160,16 +160,3 @@ jobs:
       - name: Compilation
         working-directory: frontend
         run: npm run build
-
-  build-images:
-    name: Build des images Docker
-    runs-on: ubuntu-latest
-    needs: [ tests-backend, code-quality, build-frontend ]
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Image backend
-        run: docker build -t cesizen-backend ./backend
-
-      - name: Image frontend
-        run: docker build -t cesizen-frontend ./frontend
