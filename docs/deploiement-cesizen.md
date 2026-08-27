@@ -1,6 +1,6 @@
 # Plan de déploiement de CesiZen
 
-Rapport détaillé de l'état de la chaîne CI/CD et du plan de déploiement, mis à jour le 2026-08-26.
+Rapport détaillé de l'état de la chaîne CI/CD et du plan de déploiement, mis à jour le 2026-08-27.
 Le déploiement repose sur une conteneurisation Docker (frontend Nginx, backend Apache, base
 MySQL) — voir `docs/docker-cesizen.md` pour le détail de cette architecture. Ce document reflète
 le fonctionnement réel du dépôt `Celyane/CesiZen` (GitHub, visibilité **publique**), pas une
@@ -37,12 +37,28 @@ intention.
    merge autorisé uniquement si les 4 sont verts
          |
          v
-   main = code validé, images Docker construites, prêt à déployer manuellement
+   main = code validé, images Docker construites
+         |
+         |  déclenchement manuel, décision humaine (bouton "Run workflow")
+         v
+   +----------------------------------------------------------------+
+   |   GitHub Actions — .github/workflows/cd.yml                     |
+   |                                                                  |
+   |   Connexion GHCR (GITHUB_TOKEN)                                  |
+   |   Build + push ghcr.io/celyane/cesizen-backend  (latest, sha,    |
+   |                                                   tag optionnel) |
+   |   Build + push ghcr.io/celyane/cesizen-frontend (idem)           |
+   +----------------------------------------------------------------+
+         |
+         v
+   images versionnées disponibles sur GHCR, prêtes à être tirées par un
+   serveur (déploiement effectif sur ce serveur non automatisé — §5)
 ```
 
 Ce que fait la chaîne aujourd'hui : **intégration continue** (test + qualité + build applicatif +
-build des images Docker), pas de déploiement continu. Aucune étape ne pousse d'image vers un
-registre ni ne déploie sur un serveur.
+build des images Docker) suivie d'une **étape de publication manuelle** (`cd.yml`) qui pousse les
+images vers GitHub Container Registry. Il n'y a toujours **aucun déploiement automatique sur un
+serveur** : personne ne tire ces images tout seul, c'est une action humaine restant à faire (§5).
 
 ---
 
@@ -95,6 +111,41 @@ précédents ont réussi. Construit `backend/Dockerfile` et `frontend/Dockerfile
 sans les publier vers un registre) : valide que les deux images sont reproductibles à partir d'un
 checkout propre, indépendamment des tests applicatifs (une dépendance système retirée, par
 exemple, casse ce job sans faire bouger un seul test PHPUnit).
+
+---
+
+## 2 bis. Détail du job CD (`.github/workflows/cd.yml`)
+
+Déclenchement : **`workflow_dispatch` uniquement** — aucun déclencheur automatique (ni push, ni
+tag). C'est un choix assumé : publier une image n'est pas anodin (dépôt public, historique GHCR
+persistant), donc ça reste un geste explicite depuis l'onglet Actions, pas une conséquence
+indirecte d'un merge.
+
+### `push-images` — Publication des images vers GHCR
+
+Entrée optionnelle du déclenchement manuel : `tag` (ex. `v1.2.0`). Vide par défaut.
+
+1. Checkout du code.
+2. Connexion à `ghcr.io` avec `GITHUB_TOKEN` (généré automatiquement par Actions, portée
+   limitée au dépôt — pas de secret à créer ni à faire tourner).
+3. Pour chaque image (`backend`, `frontend`) :
+   - `docker/metadata-action` calcule les tags à appliquer : toujours `latest` et le sha court du
+     commit, plus le tag `tag` saisi en entrée s'il est renseigné.
+   - `docker/build-push-action` construit l'image depuis le `Dockerfile` existant (mêmes
+     Dockerfiles que `ci.yml` build-images, aucune divergence entre l'image testée et l'image
+     publiée) et la pousse vers :
+     - `ghcr.io/celyane/cesizen-backend`
+     - `ghcr.io/celyane/cesizen-frontend`
+
+Ce que ce job **ne fait pas** : il ne se connecte à aucun serveur, ne relance aucun conteneur en
+production. Il s'arrête à la publication des images sur le registre — voir §5 pour l'étape
+manuelle de déploiement effectif restante.
+
+**Prérequis ponctuel côté GitHub (une seule fois)** : la première publication d'un package GHCR
+via `GITHUB_TOKEN` le crée en visibilité **privée** par défaut, même sur un dépôt public — il faut
+aller dans Package settings → Change visibility → Public après le premier run pour que le pull soit
+possible sans authentification (sinon `docker pull` échoue avec `unauthorized` depuis un serveur
+non authentifié à GHCR).
 
 ---
 
@@ -177,14 +228,17 @@ Points clés à retenir pour le déploiement (détaillés dans `docs/docker-cesi
    ou équivalent), typiquement via un reverse proxy en amont des conteneurs plutôt que dans
    l'image `frontend` elle-même.
 2. **Sauvegardes automatisées** du volume `db_data` (voir `docs/securite-cesizen.md`).
-3. **Publier les images vers un registre** (GitHub Container Registry, Docker Hub, ou registre
-   privé) puis déclencher, sur un tag de version `vX.Y.Z`, un déploiement automatisé sur le
-   serveur cible (`docker compose pull && docker compose up -d`) — non implémenté à ce stade.
+3. **Provisionner un serveur cible** et y tirer les images publiées : aucun serveur de
+   production n'existe à ce jour. Une fois publiées par `cd.yml` (§2 bis), les images sont
+   disponibles sur GHCR mais personne ne les tire ni ne les lance — cette dernière étape
+   (`docker compose pull && docker compose up -d` sur le serveur cible) reste manuelle, par choix
+   (voir découpage ci-dessous) et par absence de serveur.
 
 Ce découpage est un choix assumé : la mise en production reste une décision humaine déclenchée
-après recette, pas un merge automatique. La chaîne CI actuelle relève de l'**intégration
-continue** (elle teste, valide la qualité et construit les images) ; les trois points ci-dessus
-sont ce qui manque pour du **déploiement continu**.
+après recette, pas un merge automatique. La chaîne actuelle couvre l'**intégration continue**
+(`ci.yml` : teste, valide la qualité, construit les images) et la **publication des images**
+(`cd.yml` : pousse vers GHCR sur déclenchement manuel) ; il manque encore le tir des images sur un
+serveur réel pour boucler jusqu'au **déploiement continu** complet.
 
 ---
 
@@ -203,11 +257,15 @@ sont ce qui manque pour du **déploiement continu**.
   successives sans risque de dérive de version.
 - Réseau Docker segmenté (`front`/`back`), base de données sans port publié, utilisateurs non-root
   des deux côtés — voir `docs/docker-cesizen.md` §3 pour le détail.
+- CD manuelle (`cd.yml`) publiant les images backend/frontend vers GitHub Container Registry
+  (`ghcr.io/celyane/cesizen-backend`, `ghcr.io/celyane/cesizen-frontend`), déclenchée
+  explicitement depuis l'onglet Actions — voir §2 bis.
 
 ## 7. Actions restantes
 
 1. Remplacer le certificat auto-signé par un certificat de confiance avant tout déploiement public
    réel (voir §5).
 2. Mettre en place des sauvegardes automatisées du volume `db_data`.
-3. Publier les images vers un registre et automatiser le déploiement sur tag de version, si un
-   déploiement continu est visé.
+3. Provisionner un serveur de production et y brancher le tir des images (`docker compose pull &&
+   docker compose up -d`) publiées par `cd.yml`, pour boucler jusqu'au déploiement continu complet
+   (voir §5).
