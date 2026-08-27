@@ -126,3 +126,55 @@ docker compose up -d --build frontend
 Le rebuild de l'image `frontend` est nécessaire : le CSS est intégré au build React au moment de
 `docker build`, pas rechargé à chaud dans un conteneur déjà démarré. Recharger
 **https://localhost:3443** ensuite pour voir la nouvelle couleur.
+
+---
+
+## 6. Déclencher manuellement la CD (publication des images sur GHCR)
+
+**Instructions pour toi — non exécutées.**
+
+Rappel : `cd.yml` n'a **aucun déclencheur automatique** (voir `docs/deploiement-cesizen.md` §2
+bis) — ni push, ni merge, ni tag ne le lance. C'est un geste manuel volontaire, à faire depuis
+`main` une fois qu'on veut publier une nouvelle version des images. Deux façons équivalentes de le
+déclencher pour la démo :
+
+### Option A — depuis l'interface GitHub (le plus visuel pour une démo)
+
+1. Aller sur l'onglet **Actions** du dépôt.
+2. Dans la liste des workflows à gauche, cliquer sur **CD**.
+3. Cliquer sur le bouton **Run workflow** (en haut à droite de la liste des runs).
+4. Vérifier que la branche sélectionnée est **main**.
+5. Champ `tag` optionnel : laisser vide pour ne publier que `latest` + le sha court, ou renseigner
+   une version explicite, par ex. `v1.0.0`.
+6. Cliquer sur le bouton vert **Run workflow**.
+
+Le run apparaît en quelques secondes dans la liste, avec le job `push-images` (build + push
+backend, puis build + push frontend).
+
+### Option B — depuis le terminal (`gh` CLI)
+
+```bash
+# Sans tag de version (latest + sha court uniquement)
+gh workflow run cd.yml --ref main
+
+# Avec un tag de version explicite
+gh workflow run cd.yml --ref main -f tag=v1.0.0
+
+# Suivre l'exécution en direct
+gh run watch $(gh run list --workflow=cd.yml --limit 1 --json databaseId --jq '.[0].databaseId')
+```
+
+### Ce qu'il faut observer
+
+- Le run se termine au bout d'1-2 minutes (deux builds Docker + deux push).
+- Sur **Packages** (page du dépôt ou `https://github.com/Celyane/CesiZen/packages`), les deux
+  images apparaissent : `cesizen-backend` et `cesizen-frontend`, avec les tags publiés.
+- **Premier run seulement** : les packages sont créés en visibilité **privée** par défaut, même
+  sur un dépôt public. Aller dans **Package settings → Change visibility → Public** sur chacun des
+  deux pour qu'un `docker pull` fonctionne sans authentification ensuite — bon point à mentionner
+  si la démo porte sur la CD (piège classique de GHCR, pas un bug du workflow).
+- Ce run **ne modifie rien sur le poste de démo** : il publie des images sur le registre, il ne
+  redémarre aucun conteneur local. Le conteneur `frontend`/`backend` lancé en §2 continue de
+  tourner sur les images construites localement, indépendamment de ce qui vient d'être publié sur
+  GHCR — bon point à clarifier si la question revient ("ça a rien changé à l'écran" est le
+  comportement attendu, pas un échec).
