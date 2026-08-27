@@ -1,0 +1,68 @@
+name: CD
+
+# Volontairement manuel : la mise en production reste une décision humaine
+# déclenchée après recette, pas un merge automatique (voir
+# docs/deploiement-cesizen.md §5). Ce workflow publie les images vers GHCR ;
+# il ne déploie sur aucun serveur (aucun serveur cible n'existe à ce jour).
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Tag de version à publier (ex: v1.2.0). Laisser vide pour ne publier que 'latest' + le sha court."
+        required: false
+        type: string
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  push-images:
+    name: Publication des images vers GHCR
+    runs-on: ubuntu-latest
+    steps:
+      - name: Récupération du code
+        uses: actions/checkout@v7
+
+      - name: Connexion à GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Métadonnées image backend
+        id: meta-backend
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/celyane/cesizen-backend
+          tags: |
+            type=raw,value=latest
+            type=raw,value=${{ inputs.tag }},enable=${{ inputs.tag != '' }}
+            type=sha,format=short
+
+      - name: Build & push backend
+        uses: docker/build-push-action@v6
+        with:
+          context: ./backend
+          push: true
+          tags: ${{ steps.meta-backend.outputs.tags }}
+          labels: ${{ steps.meta-backend.outputs.labels }}
+
+      - name: Métadonnées image frontend
+        id: meta-frontend
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/celyane/cesizen-frontend
+          tags: |
+            type=raw,value=latest
+            type=raw,value=${{ inputs.tag }},enable=${{ inputs.tag != '' }}
+            type=sha,format=short
+
+      - name: Build & push frontend
+        uses: docker/build-push-action@v6
+        with:
+          context: ./frontend
+          push: true
+          tags: ${{ steps.meta-frontend.outputs.tags }}
+          labels: ${{ steps.meta-frontend.outputs.labels }}
