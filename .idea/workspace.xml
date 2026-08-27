@@ -6,9 +6,7 @@
   <component name="ChangeListManager">
     <list default="true" id="617dda91-672f-49c9-ba78-bd1863f36df9" name="Changes" comment="Merge pull request #15 from Celyane/feature-veille&#10;&#10;chore: configuire dependabot pour la veille des dependances">
       <changelist_data name="Célyane" email="celyanecc@gmail.com" date="1770379072000" automatic="true" />
-      <change beforePath="$PROJECT_DIR$/.gitignore" beforeDir="false" afterPath="$PROJECT_DIR$/.gitignore" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/backend/src/Controller/RegistrationController.php" beforeDir="false" afterPath="$PROJECT_DIR$/backend/src/Controller/RegistrationController.php" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/frontend/src/index.css" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/src/index.css" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
