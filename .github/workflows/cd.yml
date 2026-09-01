@@ -33,7 +33,7 @@ jobs:
 
       - name: Métadonnées image backend
         id: meta-backend
-        uses: docker/metadata-action@v5
+        uses: docker/metadata-action@v6
         with:
           images: ghcr.io/celyane/cesizen-backend
           tags: |
@@ -51,7 +51,7 @@ jobs:
 
       - name: Métadonnées image frontend
         id: meta-frontend
-        uses: docker/metadata-action@v5
+        uses: docker/metadata-action@v6
         with:
           images: ghcr.io/celyane/cesizen-frontend
           tags: |
